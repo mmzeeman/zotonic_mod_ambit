@@ -1,0 +1,11 @@
+{application, zotonic_mod_ambit, [
+    {description, "Geographic indexing and search using ambit icosahedral triangular cells"},
+    {vsn, git},
+    {registered, []},
+    {applications, [kernel, stdlib, ambit]},
+    {env, []},
+    {modules, []},
+    {maintainers, []},
+    {licenses, ["Apache 2.0"]},
+    {links, [{"GitHub", "https://github.com/mmzeeman/zotonic_mod_ambit"}]}
+]}.
