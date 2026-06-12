@@ -17,7 +17,7 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
--module(scomp_ambit_map).
+-module(scomp_ambit_ambit_map).
 -author('Maas-Maarten Zeeman <mmzeeman@xs4all.nl>').
 -behaviour(zotonic_scomp).
 
@@ -34,12 +34,12 @@ render(Params, _Vars, Context) ->
             Width  = proplists:get_value(width,  Params, <<"700px">>),
             Height = proplists:get_value(height, Params, <<"480px">>),
             Vars = [
-                {location_lat, Latitude},
-                {location_lng, Longitude},
-                {zoom,         Zoom},
-                {width,        Width},
-                {height,       Height}
-                | Params
+                    {location_lat, Latitude},
+                    {location_lng, Longitude},
+                    {zoom,         Zoom},
+                    {width,        Width},
+                    {height,       Height}
+                    | Params
             ],
             {Html, _Context} = z_template:render_to_iolist("_ambit_map.tpl", Vars, Context),
             {ok, Html};
