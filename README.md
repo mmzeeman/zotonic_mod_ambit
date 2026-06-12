@@ -89,6 +89,18 @@ Cells = z_ambit:cells_within_radius(52.3, 4.9, 50.0)
 
 ---
 
+## Map scomp usage (`ambit_map`)
+
+```django
+{# Map from a resource location #}
+{% ambit_map id=id %}
+
+{# Map from explicit coordinates #}
+{% ambit_map latitude=52.3704 longitude=4.8952 zoom=13 width="100%" height="400px" %}
+```
+
+---
+
 ## Licence
 
 Copyright 2024 Maas-Maarten Zeeman
