@@ -94,7 +94,7 @@ Cells = z_ambit:cells_within_radius(52.3, 4.9, 50.0)
 Make sure the css and javascript code are loaded on the page. Either via a site wide js include, or
 a location specific include of this template:
 
-```
+```django
 {% include "_lib_leaflet.tpl" %}
 ```
 
