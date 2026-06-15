@@ -41,6 +41,7 @@ render(Params, _Vars, Context) ->
         _ -> {undefined, undefined}
     end,
     Locations = normalize_locations(proplists:get_value(locations, Params)),
+    ?DEBUG(Locations),
     HasLocation = is_float(Latitude) andalso is_float(Longitude),
     HasLocations = is_list(Locations) andalso Locations =/= [],
     case HasLocation orelse HasLocations of
@@ -56,7 +57,7 @@ render(Params, _Vars, Context) ->
                 | Params
             ],
             Vars1 = case HasLocation of
-                true -> [{location_lat, Latitude}, {location_lng, Longitude} | Vars0];
+                true -> [{location_lat, Latitude}, {location_lon, Longitude} | Vars0];
                 false -> Vars0
             end,
             Vars = case HasLocations of
@@ -80,7 +81,7 @@ get_latlong(Params, Context) ->
                             {undefined, undefined};
                         RId ->
                             {m_rsc:p(RId, computed_location_lat, Context),
-                             m_rsc:p(RId, computed_location_lng, Context)}
+                             m_rsc:p(RId, computed_location_lon, Context)}
                     end
             end;
         Lat ->
@@ -95,10 +96,10 @@ normalize_locations(_) ->
 
 normalize_location(Location) when is_map(Location); is_list(Location) ->
     Lat = get_location_value(Location, lat),
-    Lng = get_location_value(Location, lng),
+    Lon = get_location_value(Location, lon),
     Title = z_convert:to_binary(get_location_value(Location, title, <<>>)),
     Url = sanitize_location_url(z_convert:to_binary(get_location_value(Location, url, <<>>))),
-    #{lat => Lat, lng => Lng, title => Title, url => Url};
+    #{lat => Lat, lon => Lon, title => Title, url => Url};
 normalize_location(_) ->
     undefined.
 
