@@ -14,7 +14,6 @@
             {% for loc in locations %}
             <li style="border-bottom:1px solid #eee;">
                 <a href="{{ loc.url }}"
-                   aria-label="Navigate to {{ loc.title|default:"Location" }}"
                    style="display:block; padding:8px 12px; text-decoration:none; color:inherit;">{{ loc.title|default:"Location" }}</a>
             </li>
             {% endfor %}

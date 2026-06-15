@@ -40,7 +40,7 @@ render(Params, _Vars, Context) ->
         {Lat, Lng} -> {Lat, Lng};
         _ -> {undefined, undefined}
     end,
-    Locations = proplists:get_value(locations, Params),
+    Locations = normalize_locations(proplists:get_value(locations, Params)),
     HasLocation = is_float(Latitude) andalso is_float(Longitude),
     HasLocations = is_list(Locations) andalso Locations =/= [],
     case HasLocation orelse HasLocations of
@@ -87,3 +87,33 @@ get_latlong(Params, Context) ->
             {catch z_convert:to_float(Lat),
              catch z_convert:to_float(proplists:get_value(longitude, Params))}
     end.
+
+normalize_locations(Locations) when is_list(Locations) ->
+    [ Loc || Loc <- [normalize_location(Location) || Location <- Locations], Loc =/= undefined ];
+normalize_locations(_) ->
+    [].
+
+normalize_location(Location) when is_map(Location); is_list(Location) ->
+    Lat = get_location_value(Location, lat),
+    Lng = get_location_value(Location, lng),
+    Title = z_convert:to_binary(get_location_value(Location, title, <<>>)),
+    Url = sanitize_location_url(z_convert:to_binary(get_location_value(Location, url, <<>>))),
+    #{lat => Lat, lng => Lng, title => Title, url => Url};
+normalize_location(_) ->
+    undefined.
+
+get_location_value(Location, Key) ->
+    get_location_value(Location, Key, undefined).
+
+get_location_value(Location, Key, Default) when is_map(Location) ->
+    KeyBin = atom_to_binary(Key, utf8),
+    maps:get(Key, Location, maps:get(KeyBin, Location, Default));
+get_location_value(Location, Key, Default) when is_list(Location) ->
+    KeyBin = atom_to_binary(Key, utf8),
+    proplists:get_value(Key, Location, proplists:get_value(KeyBin, Location, Default)).
+
+sanitize_location_url(<<"/", _/binary>> = Url) -> Url;
+sanitize_location_url(<<"#", _/binary>> = Url) -> Url;
+sanitize_location_url(<<"http://", _/binary>> = Url) -> Url;
+sanitize_location_url(<<"https://", _/binary>> = Url) -> Url;
+sanitize_location_url(_) -> <<"#">>.
