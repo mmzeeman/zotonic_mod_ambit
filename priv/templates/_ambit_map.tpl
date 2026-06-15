@@ -29,13 +29,13 @@
         return;
     }
 
-    var map = L.map('{{ map_id }}');
-    var zoom = {{ zoom | default:15 }};
-    var locations = {% if locations %}{{ locations|to_json }}{% else %}[]{% endif %};
-    var hasSingleLocation = {% if has_location %}true{% else %}false{% endif %};
-    var locationLat = {% if has_location %}{{ location_lat|to_json }}{% else %}null{% endif %};
-    var locationLng = {% if has_location %}{{ location_lng|to_json }}{% else %}null{% endif %};
-    var bounds = [];
+    const map = L.map('{{ map_id }}');
+    const zoom = {{ zoom | default:15 }};
+    const locations = {% if locations %}{{ locations|to_json }}{% else %}[]{% endif %};
+    const hasSingleLocation = {% if has_location %}true{% else %}false{% endif %};
+    const locationLat = {% if has_location %}{{ location_lat|to_json }}{% else %}null{% endif %};
+    const locationLng = {% if has_location %}{{ location_lng|to_json }}{% else %}null{% endif %};
+    const bounds = [];
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
@@ -52,7 +52,7 @@
             return;
         }
 
-        var marker = L.marker([loc.lat, loc.lng]).addTo(map);
+        const marker = L.marker([loc.lat, loc.lng]).addTo(map);
         if (loc.title) {
             marker.bindPopup(loc.title);
         }
@@ -62,8 +62,6 @@
     if (!hasSingleLocation) {
         if (bounds.length > 0) {
             map.fitBounds(bounds, { padding: [20, 20] });
-        } else {
-            map.setView([0, 0], zoom);
         }
     }
 })();

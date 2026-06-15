@@ -36,7 +36,10 @@
 vary(_Params, _Context) -> nocache.
 
 render(Params, _Vars, Context) ->
-    {Latitude, Longitude} = get_latlong(Params, Context),
+    {Latitude, Longitude} = case get_latlong(Params, Context) of
+        {Lat, Lng} -> {Lat, Lng};
+        _ -> {undefined, undefined}
+    end,
     Locations = proplists:get_value(locations, Params),
     HasLocation = is_float(Latitude) andalso is_float(Longitude),
     HasLocations = is_list(Locations) andalso Locations =/= [],
