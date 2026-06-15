@@ -14,8 +14,8 @@
             {% for loc in locations %}
             <li style="border-bottom:1px solid #eee;">
                 <a href="{{ loc.url }}"
-                   aria-label="Navigate to {{ loc.title }}"
-                   style="display:block; padding:8px 12px; text-decoration:none; color:inherit;">{{ loc.title }}</a>
+                   aria-label="Navigate to {{ loc.title|default:"Location" }}"
+                   style="display:block; padding:8px 12px; text-decoration:none; color:inherit;">{{ loc.title|default:"Location" }}</a>
             </li>
             {% endfor %}
         </ul>
@@ -36,6 +36,10 @@
     const hasSingleLocation = {% if has_location %}true{% else %}false{% endif %};
     const locationLat = {% if has_location %}{{ location_lat|to_json }}{% else %}null{% endif %};
     const locationLng = {% if has_location %}{{ location_lng|to_json }}{% else %}null{% endif %};
+    const MIN_LAT = -90;
+    const MAX_LAT = 90;
+    const MIN_LNG = -180;
+    const MAX_LNG = 180;
     const bounds = [];
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -55,7 +59,8 @@
 
         const lat = Number(loc.lat);
         const lng = Number(loc.lng);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+            lat < MIN_LAT || lat > MAX_LAT || lng < MIN_LNG || lng > MAX_LNG) {
             return;
         }
 
