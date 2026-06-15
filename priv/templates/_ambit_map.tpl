@@ -49,10 +49,10 @@
 
         const marker = L.marker([lat, lon]).addTo(map);
         if (loc.title) {
-            marker.bindTooltip(loc.title);
+            marker.bindTooltip(loc.title, {permanent: true});
         }
         if (loc.url) {
-            marker.on('click', function() { window.location.href = loc.url; });
+            marker.on('click', () => { window.location.href = loc.url; });
         }
         bounds.push([lat, lon]);
     });
