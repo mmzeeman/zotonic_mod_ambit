@@ -41,8 +41,7 @@ render(Params, _Vars, Context) ->
                     {height,       Height}
                     | Params
             ],
-            {Html, _Context} = z_template:render_to_iolist("_ambit_map.tpl", Vars, Context),
-            {ok, Html};
+            {ok, z_template:render("_ambit_map.tpl", Vars, Context)};
         _ ->
             {ok, <<>>}
     end.

@@ -9,12 +9,17 @@
 {% javascript %}
 (function() {
     var el = document.getElementById('{{ map_id }}');
-    if (!el || typeof L === 'undefined') { return; }
-    var map = L.map('{{ map_id }}').setView([{{ location_lat }}, {{ location_lng }}], {{ zoom|default:15 }});
+    if (!el || typeof L === 'undefined') {
+        return;
+    }
+
+    let map = L.map('{{ map_id }}').setView([{{ location_lat }}, {{ location_lng }}], {{ zoom | default:15 }});
+
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
+
     L.marker([{{ location_lat }}, {{ location_lng }}]).addTo(map);
 })();
 {% endjavascript %}
