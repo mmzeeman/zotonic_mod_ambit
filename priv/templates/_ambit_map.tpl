@@ -2,25 +2,9 @@
    Variables: location_lat, location_lng, locations, zoom, width, height, element_id, class #}
 
 {% with element_id|default:#map as map_id %}
-<div class="ambit-map-container"
-     style="display:flex; width:{{ width|default:"700px" }}; max-width:100%;">
-    <div id="{{ map_id }}"
-         class="ambit-map{% if class %} {{ class }}{% endif %}"
-         style="flex:1 1 auto; min-width:0; height:{{ height|default:"480px" }};"></div>
-    {% if locations %}
-    <div class="ambit-map-list"
-         style="width:30%; height:{{ height|default:"480px" }}; overflow-y:auto; border-left:1px solid #ccc;">
-        <ul style="list-style:none; margin:0; padding:0;">
-            {% for loc in locations %}
-            <li style="border-bottom:1px solid #eee;">
-                <a href="{{ loc.url }}"
-                   style="display:block; padding:8px 12px; text-decoration:none; color:inherit;">{{ loc.title|default:"Location" }}</a>
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
-</div>
+<div id="{{ map_id }}"
+     class="ambit-map{% if class %} {{ class }}{% endif %}"
+     style="width:{{ width|default:"700px" }}; height:{{ height|default:"480px" }};"></div>
 
 {% javascript %}
 (function() {
@@ -65,7 +49,10 @@
 
         const marker = L.marker([lat, lng]).addTo(map);
         if (loc.title) {
-            marker.bindPopup(loc.title);
+            marker.bindTooltip(loc.title);
+        }
+        if (loc.url) {
+            marker.on('click', function() { window.location = loc.url; });
         }
         bounds.push([lat, lng]);
     });
