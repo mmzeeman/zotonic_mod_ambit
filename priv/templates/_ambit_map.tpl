@@ -52,7 +52,7 @@
             marker.bindTooltip(loc.title);
         }
         if (loc.url) {
-            marker.on('click', function() { window.location = loc.url; });
+            marker.on('click', function() { window.location.href = loc.url; });
         }
         bounds.push([lat, lng]);
     });
