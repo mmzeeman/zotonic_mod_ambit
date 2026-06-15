@@ -1,7 +1,15 @@
 %% @author Maas-Maarten Zeeman <mmzeeman@xs4all.nl>
 %% @copyright 2024 Maas-Maarten Zeeman
-%% @doc Show an interactive Leaflet map for a location.
-%%      Use as: {% ambit_map id=id %} or {% ambit_map latitude=52.0 longitude=4.3 %}
+%% @doc Show an interactive Leaflet map for one or more locations.
+%%
+%% Single location (unchanged):
+%%   {% ambit_map latitude=52.3 longitude=4.9 zoom=13 %}
+%%
+%% List of locations:
+%%   {% ambit_map locations=my_locations_var width="900px" height="500px" %}
+%%
+%% Both (centre + list):
+%%   {% ambit_map latitude=52.3 longitude=4.9 locations=my_locations_var %}
 
 %% Copyright 2024 Maas-Maarten Zeeman
 %%
@@ -28,21 +36,32 @@
 vary(_Params, _Context) -> nocache.
 
 render(Params, _Vars, Context) ->
-    case get_latlong(Params, Context) of
-        {Latitude, Longitude} when is_float(Latitude), is_float(Longitude) ->
+    {Latitude, Longitude} = get_latlong(Params, Context),
+    Locations = proplists:get_value(locations, Params),
+    HasLocation = is_float(Latitude) andalso is_float(Longitude),
+    HasLocations = is_list(Locations) andalso Locations =/= [],
+    case HasLocation orelse HasLocations of
+        true ->
             Zoom   = z_convert:to_integer(proplists:get_value(zoom,   Params, 15)),
             Width  = proplists:get_value(width,  Params, <<"700px">>),
             Height = proplists:get_value(height, Params, <<"480px">>),
-            Vars = [
-                    {location_lat, Latitude},
-                    {location_lng, Longitude},
-                    {zoom,         Zoom},
-                    {width,        Width},
-                    {height,       Height}
-                    | Params
+            Vars0 = [
+                {has_location, HasLocation},
+                {zoom,   Zoom},
+                {width,  Width},
+                {height, Height}
+                | Params
             ],
+            Vars1 = case HasLocation of
+                true -> [{location_lat, Latitude}, {location_lng, Longitude} | Vars0];
+                false -> Vars0
+            end,
+            Vars = case HasLocations of
+                true -> [{locations, Locations} | Vars1];
+                false -> Vars1
+            end,
             {ok, z_template:render("_ambit_map.tpl", Vars, Context)};
-        _ ->
+        false ->
             {ok, <<>>}
     end.
 
