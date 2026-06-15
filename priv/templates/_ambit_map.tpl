@@ -14,6 +14,7 @@
             {% for loc in locations %}
             <li style="border-bottom:1px solid #eee;">
                 <a href="{{ loc.url }}"
+                   aria-label="Navigate to {{ loc.title }}"
                    style="display:block; padding:8px 12px; text-decoration:none; color:inherit;">{{ loc.title }}</a>
             </li>
             {% endfor %}
@@ -52,16 +53,24 @@
             return;
         }
 
-        const marker = L.marker([loc.lat, loc.lng]).addTo(map);
+        const lat = Number(loc.lat);
+        const lng = Number(loc.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            return;
+        }
+
+        const marker = L.marker([lat, lng]).addTo(map);
         if (loc.title) {
             marker.bindPopup(loc.title);
         }
-        bounds.push([loc.lat, loc.lng]);
+        bounds.push([lat, lng]);
     });
 
     if (!hasSingleLocation) {
         if (bounds.length > 0) {
             map.fitBounds(bounds, { padding: [20, 20] });
+        } else {
+            map.setView([0, 0], zoom);
         }
     }
 })();
