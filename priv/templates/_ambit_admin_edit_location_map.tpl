@@ -34,7 +34,7 @@
         } else {
             marker = L.marker([lat, lng]).addTo(map);
         }
-        // Keep the hidden / visible inputs in sync
+        // Keep the visible inputs in sync
         if (latInput)  latInput.value  = lat;
         if (lngInput)  lngInput.value  = lng;
     }
@@ -51,6 +51,13 @@
         setMarker(e.latlng.lat, e.latlng.lng);
         if (!marker || !hasLocation) {
             map.setView(e.latlng, map.getZoom());
+        }
+    });
+
+    // Map zoom changes (scroll, +/- buttons, setZoom …) → sync field
+    map.on('zoomend', function() {
+        if (zoomInput) {
+            zoomInput.value = map.getZoom();
         }
     });
 
@@ -74,8 +81,8 @@
         }
     }
 
-    if (latInput)  latInput.addEventListener('change',  onLatLngChange);
-    if (lngInput)  lngInput.addEventListener('change',  onLatLngChange);
+    if (latInput)  latInput.addEventListener('change', onLatLngChange);
+    if (lngInput)  lngInput.addEventListener('change', onLatLngChange);
 })();
 {% endjavascript %}
 
