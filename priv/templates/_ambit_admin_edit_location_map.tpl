@@ -1,5 +1,6 @@
 {% with id.location_lat as latitude %}
 {% with id.location_lng as longitude %}
+{% with m.rsc[id].location_zoom_level|default:13 as zoom %}
 
 <div id="{{ #ambitmap }}" style="height:480px"></div>
 
@@ -15,11 +16,17 @@
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    const initialLat = parseFloat("{{ latitude }}");
-    const initialLng = parseFloat("{{ longitude }}");
+    const initialLat  = parseFloat("{{ latitude }}");
+    const initialLng  = parseFloat("{{ longitude }}");
+    const initialZoom = parseInt("{{ zoom }}", 10) || 13;
     const hasLocation = !isNaN(initialLat) && !isNaN(initialLng);
 
     let marker = null;
+
+    // Grab the sibling form inputs by their stable id attributes
+    const latInput  = document.getElementById('location_lat');
+    const lngInput  = document.getElementById('location_lng');
+    const zoomInput = document.getElementById('location_zoom_level');
 
     function setMarker(lat, lng) {
         if (marker) {
@@ -27,29 +34,51 @@
         } else {
             marker = L.marker([lat, lng]).addTo(map);
         }
-        // Update the hidden location inputs so the new value is saved with the resource
-        const latInput = document.querySelector('input[name="location_lat"]');
-        const lngInput = document.querySelector('input[name="location_lng"]');
-        if (latInput) latInput.value = lat;
-        if (lngInput) lngInput.value = lng;
+        // Keep the hidden / visible inputs in sync
+        if (latInput)  latInput.value  = lat;
+        if (lngInput)  lngInput.value  = lng;
     }
 
     if (hasLocation) {
-        map.setView([initialLat, initialLng], 13);
+        map.setView([initialLat, initialLng], initialZoom);
         setMarker(initialLat, initialLng);
     } else {
         map.setView([0, 0], 2);
     }
 
+    // Click on map → move marker
     map.on('click', function(e) {
         setMarker(e.latlng.lat, e.latlng.lng);
-        if (!hasLocation) {
-            // Zoom in on the first click when no location was set yet
-            map.setView(e.latlng, 13);
+        if (!marker || !hasLocation) {
+            map.setView(e.latlng, map.getZoom());
         }
     });
+
+    // Zoom-level field → update map zoom
+    if (zoomInput) {
+        zoomInput.addEventListener('change', function() {
+            const z = parseInt(this.value, 10);
+            if (!isNaN(z)) {
+                map.setZoom(z);
+            }
+        });
+    }
+
+    // Lat / Lng fields → move marker and pan map
+    function onLatLngChange() {
+        const lat = parseFloat(latInput  ? latInput.value  : NaN);
+        const lng = parseFloat(lngInput  ? lngInput.value  : NaN);
+        if (!isNaN(lat) && !isNaN(lng)) {
+            setMarker(lat, lng);
+            map.panTo([lat, lng]);
+        }
+    }
+
+    if (latInput)  latInput.addEventListener('change',  onLatLngChange);
+    if (lngInput)  lngInput.addEventListener('change',  onLatLngChange);
 })();
 {% endjavascript %}
 
+{% endwith %}
 {% endwith %}
 {% endwith %}
