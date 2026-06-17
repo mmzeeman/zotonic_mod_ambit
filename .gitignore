@@ -4,3 +4,4 @@ erl_crash.dump
 .rebar3/
 *.plt
 priv/log/
+tags
