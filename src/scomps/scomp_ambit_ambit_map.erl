@@ -41,8 +41,8 @@ render(Params, _Vars, Context) ->
         _ -> {undefined, undefined}
     end,
     Locations = normalize_locations(proplists:get_value(locations, Params)),
-    ?DEBUG(Locations),
     HasLocation = is_float(Latitude) andalso is_float(Longitude),
+    ?DEBUG(HasLocation),
     HasLocations = is_list(Locations) andalso Locations =/= [],
     case HasLocation orelse HasLocations of
         true ->

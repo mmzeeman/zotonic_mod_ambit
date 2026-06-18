@@ -17,8 +17,8 @@
     const zoom = {{ zoom | default:15 }};
     const locations = {% if locations %}{{ locations | to_json }}{% else %}[]{% endif %};
     const hasSingleLocation = {% if has_location %}true{% else %}false{% endif %};
-    const locationLat = {% if has_location %}{{ location_lat|to_json }}{% else %}null{% endif %};
-    const locationLng = {% if has_location %}{{ location_lon|to_json }}{% else %}null{% endif %};
+    const locationLat = {% if has_location %}{{ location_lat | to_json }}{% else %}null{% endif %};
+    const locationLng = {% if has_location %}{{ location_lon | to_json }}{% else %}null{% endif %};
     const MIN_LAT = -90;
     const MAX_LAT = 90;
     const MIN_LNG = -180;
@@ -46,6 +46,8 @@
             lat < MIN_LAT || lat > MAX_LAT || lon < MIN_LNG || lon > MAX_LNG) {
             return;
         }
+
+        console.log(lat, lon);
 
         const marker = L.marker([lat, lon]).addTo(map);
         if (loc.title) {

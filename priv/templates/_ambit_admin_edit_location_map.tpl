@@ -35,8 +35,12 @@
             marker = L.marker([lat, lng]).addTo(map);
         }
         // Keep the visible inputs in sync
-        if (latInput)  latInput.value  = lat;
-        if (lngInput)  lngInput.value  = lng;
+        if (latInput) {
+            latInput.value  = lat;
+        }
+        if (lngInput)  {
+            lngInput.value  = lng;
+        }
     }
 
     if (hasLocation) {
@@ -81,8 +85,12 @@
         }
     }
 
-    if (latInput)  latInput.addEventListener('change', onLatLngChange);
-    if (lngInput)  lngInput.addEventListener('change', onLatLngChange);
+    if(latInput) {
+        latInput.addEventListener('change', onLatLngChange);
+    }
+    if (lngInput) {
+        lngInput.addEventListener('change', onLatLngChange);
+    }
 })();
 {% endjavascript %}
 
