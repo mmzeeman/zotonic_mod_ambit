@@ -10,8 +10,14 @@
 %%
 %% Both (centre + list):
 %%   {% ambit_map latitude=52.3 longitude=4.9 locations=my_locations_var %}
+%%
+%% List of resource ids as locations:
+%%   {% ambit_map ids=my_ids_var width="900px" height="500px" %}
+%%
+%% Resource ids combined with explicit locations:
+%%   {% ambit_map ids=my_ids_var locations=my_locations_var %}
 
-%% Copyright 2024 Maas-Maarten Zeeman
+%% Copyright 2024-2026 Maas-Maarten Zeeman
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -40,9 +46,10 @@ render(Params, _Vars, Context) ->
         {Lat, Lng} -> {Lat, Lng};
         _ -> {undefined, undefined}
     end,
-    Locations = normalize_locations(proplists:get_value(locations, Params)),
+    ExplicitLocations = normalize_locations(proplists:get_value(locations, Params)),
+    IdLocations = ids_to_locations(proplists:get_value(ids, Params), Context),
+    Locations = IdLocations ++ ExplicitLocations,
     HasLocation = is_float(Latitude) andalso is_float(Longitude),
-    ?DEBUG(HasLocation),
     HasLocations = is_list(Locations) andalso Locations =/= [],
     case HasLocation orelse HasLocations of
         true ->
@@ -80,8 +87,8 @@ get_latlong(Params, Context) ->
                         undefined ->
                             {undefined, undefined};
                         RId ->
-                            {m_rsc:p(RId, computed_location_lat, Context),
-                             m_rsc:p(RId, computed_location_lon, Context)}
+                            {m_rsc:p(RId, location_lat, Context),
+                             m_rsc:p(RId, location_lon, Context)}
                     end
             end;
         Lat ->
@@ -92,6 +99,35 @@ get_latlong(Params, Context) ->
 normalize_locations(Locations) when is_list(Locations) ->
     [ Loc || Loc <- [normalize_location(Location) || Location <- Locations], Loc =/= undefined ];
 normalize_locations(_) ->
+    [].
+
+%% @doc Resolve a list of resource ids to location maps.
+%%      Each id is looked up via m_rsc; resources without a computed location
+%%      are silently skipped.
+ids_to_locations(Ids, Context) when is_list(Ids) ->
+    lists:filtermap(
+        fun(Id) ->
+            case m_rsc:rid(Id, Context) of
+                undefined ->
+                    false;
+                RId ->
+                    case {m_rsc:p(RId, location_lat, Context),
+                          m_rsc:p(RId, location_lon, Context)} of
+                        {Lat, Lon} when is_float(Lat), is_float(Lon) ->
+                            Title = z_convert:to_binary(
+                                        m_rsc:p(RId, title, Context)),
+                            Url = sanitize_location_url(
+                                        z_convert:to_binary(
+                                            m_rsc:p(RId, page_url, Context))),
+                            {true, #{lat => Lat, lon => Lon,
+                                     title => Title, url => Url}};
+                        _ ->
+                            false
+                    end
+            end
+        end,
+        Ids);
+ids_to_locations(_, _Context) ->
     [].
 
 normalize_location(Location) when is_map(Location); is_list(Location) ->
