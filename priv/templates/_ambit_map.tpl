@@ -18,7 +18,7 @@
     const locations = {% if locations %}{{ locations | to_json }}{% else %}[]{% endif %};
     const hasSingleLocation = {% if has_location %}true{% else %}false{% endif %};
     const locationLat = {% if has_location %}{{ location_lat | to_json }}{% else %}null{% endif %};
-    const locationLng = {% if has_location %}{{ location_lon | to_json }}{% else %}null{% endif %};
+    const locationLng = {% if has_location %}{{ location_lng | to_json }}{% else %}null{% endif %};
     const MIN_LAT = -90;
     const MAX_LAT = 90;
     const MIN_LNG = -180;
