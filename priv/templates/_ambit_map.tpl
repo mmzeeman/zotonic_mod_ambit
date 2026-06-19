@@ -31,8 +31,8 @@
     }).addTo(map);
 
     if (hasSingleLocation) {
-        map.setView([locationLat, locationLng], zoom);
         L.marker([locationLat, locationLng]).addTo(map);
+        bounds.push([locationLat, locationLng]);
     }
 
     locations.forEach(function(loc) {
@@ -47,8 +47,6 @@
             return;
         }
 
-        console.log(lat, lon);
-
         const marker = L.marker([lat, lon]).addTo(map);
         if (loc.title) {
             marker.bindTooltip(loc.title, {permanent: true});
@@ -59,12 +57,12 @@
         bounds.push([lat, lon]);
     });
 
-    if (!hasSingleLocation) {
-        if (bounds.length > 0) {
-            map.fitBounds(bounds, { padding: [20, 20] });
-        } else {
-            map.setView([0, 0], zoom);
-        }
+    if (bounds.length > 1) {
+        map.fitBounds(bounds, { padding: [20, 20] });
+    } else if (bounds.length === 1) {
+        map.setView(bounds[0], zoom);
+    } else {
+        map.setView([0, 0], zoom);
     }
 })();
 {% endjavascript %}
