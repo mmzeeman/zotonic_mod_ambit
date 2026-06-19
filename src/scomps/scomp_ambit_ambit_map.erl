@@ -42,12 +42,14 @@
 vary(_Params, _Context) -> nocache.
 
 render(Params, _Vars, Context) ->
+    ?DEBUG(Params),
     {Latitude, Longitude} = case get_latlong(Params, Context) of
         {Lat, Lng} -> {Lat, Lng};
         _ -> {undefined, undefined}
     end,
     ExplicitLocations = normalize_locations(proplists:get_value(locations, Params)),
     IdLocations = ids_to_locations(proplists:get_value(ids, Params), Context),
+    ?DEBUG(IdLocations),
     Locations = IdLocations ++ ExplicitLocations,
     HasLocation = is_float(Latitude) andalso is_float(Longitude),
     HasLocations = is_list(Locations) andalso Locations =/= [],
@@ -64,7 +66,7 @@ render(Params, _Vars, Context) ->
                 | Params
             ],
             Vars1 = case HasLocation of
-                true -> [{location_lat, Latitude}, {location_lon, Longitude} | Vars0];
+                true -> [{location_lat, Latitude}, {location_lng, Longitude} | Vars0];
                 false -> Vars0
             end,
             Vars = case HasLocations of
@@ -87,13 +89,11 @@ get_latlong(Params, Context) ->
                         undefined ->
                             {undefined, undefined};
                         RId ->
-                            {m_rsc:p(RId, location_lat, Context),
-                             m_rsc:p(RId, location_lon, Context)}
+                            {m_rsc:p(RId, location_lat, Context), m_rsc:p(RId, location_lng, Context)}
                     end
             end;
         Lat ->
-            {catch z_convert:to_float(Lat),
-             catch z_convert:to_float(proplists:get_value(longitude, Params))}
+            {catch z_convert:to_float(Lat), catch z_convert:to_float(proplists:get_value(longitude, Params))}
     end.
 
 normalize_locations(Locations) when is_list(Locations) ->
@@ -107,24 +107,19 @@ normalize_locations(_) ->
 ids_to_locations(Ids, Context) when is_list(Ids) ->
     lists:filtermap(
         fun(Id) ->
-            case m_rsc:rid(Id, Context) of
-                undefined ->
-                    false;
-                RId ->
-                    case {m_rsc:p(RId, location_lat, Context),
-                          m_rsc:p(RId, location_lon, Context)} of
-                        {Lat, Lon} when is_float(Lat), is_float(Lon) ->
-                            Title = z_convert:to_binary(
-                                        m_rsc:p(RId, title, Context)),
-                            Url = sanitize_location_url(
-                                        z_convert:to_binary(
-                                            m_rsc:p(RId, page_url, Context))),
-                            {true, #{lat => Lat, lon => Lon,
-                                     title => Title, url => Url}};
-                        _ ->
-                            false
-                    end
-            end
+                case m_rsc:rid(Id, Context) of
+                    undefined ->
+                        false;
+                    RId ->
+                        case {m_rsc:p(RId, location_lat, Context), m_rsc:p(RId, location_lng, Context)} of
+                            {Lat, Lon} when is_float(Lat), is_float(Lon) ->
+                                Title = z_trans:trans(m_rsc:p(RId, title, Context), Context),
+                                Url = m_rsc:p(RId, page_url, Context),
+                                {true, #{lat => Lat, lon => Lon, title => Title, url => Url}};
+                            _ ->
+                                false
+                        end
+                end
         end,
         Ids);
 ids_to_locations(_, _Context) ->
