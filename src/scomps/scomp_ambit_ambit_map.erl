@@ -16,6 +16,9 @@
 %%
 %% Resource ids combined with explicit locations:
 %%   {% ambit_map ids=my_ids_var locations=my_locations_var %}
+%%
+%% Use id/lat+lon as map centre only, without placing a marker:
+%%   {% ambit_map id=m.rsc.headquarters.id ids=branch_ids show_center_marker=false %}
 
 %% Copyright 2024-2026 Maas-Maarten Zeeman
 %%
@@ -58,8 +61,11 @@ render(Params, _Vars, Context) ->
             Zoom   = z_convert:to_integer(proplists:get_value(zoom,   Params, 15)),
             Width  = proplists:get_value(width,  Params, <<"700px">>),
             Height = proplists:get_value(height, Params, <<"480px">>),
+            ShowCenterMarker = z_convert:to_bool(
+                                   proplists:get_value(show_center_marker, Params, true)),
             Vars0 = [
                 {has_location, HasLocation},
+                {show_center_marker, ShowCenterMarker},
                 {zoom,   Zoom},
                 {width,  Width},
                 {height, Height}

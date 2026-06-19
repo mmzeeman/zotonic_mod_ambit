@@ -1,5 +1,6 @@
 {# Renders an interactive Leaflet map for one or more locations.
-   Variables: location_lat, location_lon, locations, zoom, width, height, element_id, class #}
+   Variables: location_lat, location_lng, locations, zoom, width, height, element_id, class,
+              show_center_marker #}
 
 {% with element_id|default:#map as map_id %}
 <div id="{{ map_id }}"
@@ -17,6 +18,7 @@
     const zoom = {{ zoom | default:15 }};
     const locations = {% if locations %}{{ locations | to_json }}{% else %}[]{% endif %};
     const hasSingleLocation = {% if has_location %}true{% else %}false{% endif %};
+    const showCenterMarker = {% if show_center_marker %}true{% else %}false{% endif %};
     const locationLat = {% if has_location %}{{ location_lat | to_json }}{% else %}null{% endif %};
     const locationLng = {% if has_location %}{{ location_lng | to_json }}{% else %}null{% endif %};
     const MIN_LAT = -90;
@@ -25,12 +27,16 @@
     const MAX_LNG = 180;
     const bounds = [];
 
+    // When hasSingleLocation is true but showCenterMarker is false, keep the
+    // centre point as a fallback for setView when no other markers are present.
+    const centrePoint = hasSingleLocation ? [locationLat, locationLng] : null;
+
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    if (hasSingleLocation) {
+    if (hasSingleLocation && showCenterMarker) {
         L.marker([locationLat, locationLng]).addTo(map);
         bounds.push([locationLat, locationLng]);
     }
@@ -61,6 +67,8 @@
         map.fitBounds(bounds, { padding: [20, 20] });
     } else if (bounds.length === 1) {
         map.setView(bounds[0], zoom);
+    } else if (centrePoint) {
+        map.setView(centrePoint, zoom);
     } else {
         map.setView([0, 0], zoom);
     }
