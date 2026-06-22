@@ -45,14 +45,12 @@
 vary(_Params, _Context) -> nocache.
 
 render(Params, _Vars, Context) ->
-    ?DEBUG(Params),
     {Latitude, Longitude} = case get_latlong(Params, Context) of
         {Lat, Lng} -> {Lat, Lng};
         _ -> {undefined, undefined}
     end,
     ExplicitLocations = normalize_locations(proplists:get_value(locations, Params)),
     IdLocations = ids_to_locations(proplists:get_value(ids, Params), Context),
-    ?DEBUG(IdLocations),
     Locations = IdLocations ++ ExplicitLocations,
     HasLocation = is_float(Latitude) andalso is_float(Longitude),
     HasLocations = is_list(Locations) andalso Locations =/= [],
