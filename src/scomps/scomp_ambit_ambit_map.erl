@@ -56,16 +56,22 @@ render(Params, _Vars, Context) ->
     Locations = IdLocations ++ ExplicitLocations,
     HasLocation = is_float(Latitude) andalso is_float(Longitude),
     HasLocations = is_list(Locations) andalso Locations =/= [],
-    case HasLocation orelse HasLocations of
+    SelectOnMap = z_convert:to_bool(proplists:get_value(select_on_map, Params, false)),
+    case HasLocation orelse HasLocations orelse SelectOnMap of
         true ->
             Zoom   = z_convert:to_integer(proplists:get_value(zoom,   Params, 15)),
             Width  = proplists:get_value(width,  Params, <<"700px">>),
             Height = proplists:get_value(height, Params, <<"480px">>),
             ShowCenterMarker = z_convert:to_bool(
                                    proplists:get_value(show_center_marker, Params, true)),
+            LatFieldId = proplists:get_value(lat_field_id, Params, undefined),
+            LngFieldId = proplists:get_value(lng_field_id, Params, undefined),
             Vars0 = [
                 {has_location, HasLocation},
                 {show_center_marker, ShowCenterMarker},
+                {select_on_map, SelectOnMap},
+                {lat_field_id, LatFieldId},
+                {lng_field_id, LngFieldId},
                 {zoom,   Zoom},
                 {width,  Width},
                 {height, Height}

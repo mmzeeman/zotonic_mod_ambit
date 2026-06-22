@@ -1,6 +1,6 @@
 {# Renders an interactive Leaflet map for one or more locations.
    Variables: location_lat, location_lng, locations, zoom, width, height, element_id, class,
-              show_center_marker #}
+              show_center_marker, select_on_map, lat_field_id, lng_field_id #}
 
 {% with element_id|default:#map as map_id %}
 <div id="{{ map_id }}"
@@ -19,6 +19,9 @@
     const locations = {% if locations %}{{ locations | to_json }}{% else %}[]{% endif %};
     const hasSingleLocation = {% if has_location %}true{% else %}false{% endif %};
     const showCenterMarker = {% if show_center_marker %}true{% else %}false{% endif %};
+    const selectOnMap = {% if select_on_map %}true{% else %}false{% endif %};
+    const latFieldId = {% if lat_field_id %}"{{ lat_field_id }}"{% else %}null{% endif %};
+    const lngFieldId = {% if lng_field_id %}"{{ lng_field_id }}"{% else %}null{% endif %};
     const locationLat = {% if has_location %}{{ location_lat | to_json }}{% else %}null{% endif %};
     const locationLng = {% if has_location %}{{ location_lng | to_json }}{% else %}null{% endif %};
     const MIN_LAT = -90;
@@ -62,6 +65,50 @@
         }
         bounds.push([lat, lon]);
     });
+
+    if (selectOnMap) {
+        let selectMarker = null;
+
+        const writeSelectFields = function(lat, lng) {
+            if (latFieldId) {
+                const latEl = document.getElementById(latFieldId);
+                if (latEl) { latEl.value = lat; }
+            }
+            if (lngFieldId) {
+                const lngEl = document.getElementById(lngFieldId);
+                if (lngEl) { lngEl.value = lng; }
+            }
+        };
+
+        const placeSelectMarker = function(lat, lng) {
+            if (selectMarker) {
+                selectMarker.setLatLng([lat, lng]);
+            } else {
+                selectMarker = L.marker([lat, lng], {draggable: true}).addTo(map);
+                selectMarker.on('dragend', function() {
+                    const pos = selectMarker.getLatLng();
+                    writeSelectFields(pos.lat, pos.lng);
+                    if (latFieldId) {
+                        const latEl = document.getElementById(latFieldId);
+                        if (latEl) { latEl.dispatchEvent(new Event('input')); }
+                    }
+                    if (lngFieldId) {
+                        const lngEl = document.getElementById(lngFieldId);
+                        if (lngEl) { lngEl.dispatchEvent(new Event('input')); }
+                    }
+                });
+            }
+            writeSelectFields(lat, lng);
+        };
+
+        if (hasSingleLocation) {
+            placeSelectMarker(locationLat, locationLng);
+        }
+
+        map.on('click', function(e) {
+            placeSelectMarker(e.latlng.lat, e.latlng.lng);
+        });
+    }
 
     if (bounds.length > 1) {
         map.fitBounds(bounds, { padding: [20, 20] });
