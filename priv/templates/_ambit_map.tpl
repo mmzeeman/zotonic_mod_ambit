@@ -74,14 +74,14 @@
                 const latEl = document.getElementById(latFieldId);
                 if (latEl) {
                     latEl.value = lat;
-                    latEl.dispatchEvent(new Event('input'));
+                    latEl.dispatchEvent(new Event('input', {bubbles: true}));
                 }
             }
             if (lngFieldId) {
                 const lngEl = document.getElementById(lngFieldId);
                 if (lngEl) {
                     lngEl.value = lng;
-                    lngEl.dispatchEvent(new Event('input'));
+                    lngEl.dispatchEvent(new Event('input', {bubbles: true}));
                 }
             }
         };
