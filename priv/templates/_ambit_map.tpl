@@ -72,11 +72,17 @@
         const writeSelectFields = function(lat, lng) {
             if (latFieldId) {
                 const latEl = document.getElementById(latFieldId);
-                if (latEl) { latEl.value = lat; }
+                if (latEl) {
+                    latEl.value = lat;
+                    latEl.dispatchEvent(new Event('input'));
+                }
             }
             if (lngFieldId) {
                 const lngEl = document.getElementById(lngFieldId);
-                if (lngEl) { lngEl.value = lng; }
+                if (lngEl) {
+                    lngEl.value = lng;
+                    lngEl.dispatchEvent(new Event('input'));
+                }
             }
         };
 
@@ -88,14 +94,6 @@
                 selectMarker.on('dragend', function() {
                     const pos = selectMarker.getLatLng();
                     writeSelectFields(pos.lat, pos.lng);
-                    if (latFieldId) {
-                        const latEl = document.getElementById(latFieldId);
-                        if (latEl) { latEl.dispatchEvent(new Event('input')); }
-                    }
-                    if (lngFieldId) {
-                        const lngEl = document.getElementById(lngFieldId);
-                        if (lngEl) { lngEl.dispatchEvent(new Event('input')); }
-                    }
                 });
             }
             writeSelectFields(lat, lng);
