@@ -34,9 +34,12 @@
     // centre point as a fallback for setView when no other markers are present.
     const centrePoint = hasSingleLocation ? [locationLat, locationLng] : null;
 
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    // https://carto.com/blog/new-voyager-basemap/
+    L.tileLayer(
+       'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', {
+        maxZoom: 20,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
+        '&copy; <a href="https://carto.com/">CARTO</a>'
     }).addTo(map);
 
     if (hasSingleLocation && showCenterMarker) {
@@ -57,12 +60,13 @@
         }
 
         const marker = L.marker([lat, lon]).addTo(map);
-        if (loc.title) {
-            marker.bindTooltip(loc.title, {permanent: true});
+        if (loc.title || loc.url) {
+            const content = loc.url
+                ? `<a href="${loc.url}">${loc.title || loc.url}</a>`
+                : loc.title;
+            marker.bindPopup(content);
         }
-        if (loc.url) {
-            marker.on('click', () => { window.location.href = loc.url; });
-        }
+
         bounds.push([lat, lon]);
     });
 

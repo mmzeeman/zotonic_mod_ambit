@@ -93,8 +93,8 @@ m_get([<<"cell">> | Rest], Msg, _Context) ->
     end;
 
 m_get(Path, _Msg, _Context) ->
-    logger:info("[m_ambit] unknown path: ~p", [Path]),
-    {error, unknown}.
+    ?LOG_WARNING(#{ text => "Unknown path", path => Path }),
+    {error, unknown_path}.
 
 
 %% ---------------------------------------------------------------------------
