@@ -59,13 +59,25 @@
             return;
         }
 
-        const marker = L.marker([lat, lon]).addTo(map);
+        const marker = L.marker([lat, lon]);
+
         if (loc.title || loc.url) {
             const content = loc.url
                 ? `<a href="${loc.url}">${loc.title || loc.url}</a>`
                 : loc.title;
             marker.bindPopup(content);
         }
+
+        if (loc.html) {
+            marker.setIcon(L.divIcon({className: 'resource-marker',
+                   html: loc.html,
+                   iconSize: [40, 40],
+                   iconAnchor: [20, 40],
+                   popupAnchor: [0, -40]
+                   }));
+        }
+
+        marker.addTo(map);
 
         bounds.push([lat, lon]);
     });

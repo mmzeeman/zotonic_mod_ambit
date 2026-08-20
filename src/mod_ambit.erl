@@ -25,15 +25,15 @@
 -include_lib("zotonic_core/include/zotonic.hrl").
 
 -export([
-    init/1,
-    observe_custom_pivot/2,
-    observe_rsc_get/3
+    init/1
+    % observe_custom_pivot/2,
+    % observe_rsc_get/3
 ]).
 
 init(Context) ->
-    ok = z_pivot_rsc:define_custom_pivot(?MODULE,
-                                         [#column_def{ name = ambit_code, type = <<"TEXT">>}],
-                                         Context),
+    %ok = z_pivot_rsc:define_custom_pivot(?MODULE,
+    %                                     [#column_def{ name = ambit_code, type = <<"TEXT">>}],
+    %                                     Context),
 
     ok.
 

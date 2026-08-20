@@ -123,9 +123,24 @@ ids_to_locations(Ids, Context) when is_list(Ids) ->
                     RId ->
                         case {m_rsc:p(RId, location_lat, Context), m_rsc:p(RId, location_lng, Context)} of
                             {Lat, Lon} when is_float(Lat), is_float(Lon) ->
-                                Title = z_trans:trans(m_rsc:p(RId, title, Context), Context),
-                                Url = m_rsc:p(RId, page_url, Context),
-                                {true, #{lat => Lat, lon => Lon, title => Title, url => Url}};
+                                Vars = #{ id => RId },
+                                case z_template_compiler_runtime:map_template({cat, <<"_ambit_map_marker.tpl">>}, Vars, Context) of
+                                    {ok, Template} ->
+                                        Title = render_block(title, Template, Vars, Context),
+                                        Url = render_block(url, Template, Vars, Context),
+                                        Html = render_block(html, Template, Vars, Context),
+                                        {true, #{lat => Lat, lon => Lon, title => Title, url => Url, html => Html}};
+                                    {error, enoent} ->
+                                        ?LOG_ERROR(#{
+                                                     text => <<"Missing map marker template">>,
+                                                     in => mod_ambit,
+                                                     result => error,
+                                                     reason => enoent,
+                                                     template => <<"_ambit_marker_template.tpl">>,
+                                                     id => Id
+                                                    }),
+                                        false
+                                end;
                             _ ->
                                 false
                         end
@@ -140,6 +155,7 @@ normalize_location(Location) when is_map(Location); is_list(Location) ->
     Lon = get_location_value(Location, lon),
     Title = z_convert:to_binary(get_location_value(Location, title, <<>>)),
     Url = sanitize_location_url(z_convert:to_binary(get_location_value(Location, url, <<>>))),
+
     #{lat => Lat, lon => Lon, title => Title, url => Url};
 normalize_location(_) ->
     undefined.
@@ -159,3 +175,8 @@ sanitize_location_url(<<"#", _/binary>> = Url) -> Url;
 sanitize_location_url(<<"http://", _/binary>> = Url) -> Url;
 sanitize_location_url(<<"https://", _/binary>> = Url) -> Url;
 sanitize_location_url(_) -> <<"#">>.
+
+render_block(Block, Template, Vars, Context) ->
+    {Output, _RenderState} = z_template:render_block_to_iolist(Block, Template, Vars, Context),
+    z_string:trim(iolist_to_binary(Output)).
+
