@@ -126,10 +126,12 @@ ids_to_locations(Ids, Context) when is_list(Ids) ->
                                 Vars = #{ id => RId },
                                 case z_template_compiler_runtime:map_template({cat, <<"_ambit_map_marker.tpl">>}, Vars, Context) of
                                     {ok, Template} ->
-                                        Title = render_block(title, Template, Vars, Context),
-                                        Url = render_block(url, Template, Vars, Context),
                                         Html = render_block(html, Template, Vars, Context),
-                                        {true, #{lat => Lat, lon => Lon, title => Title, url => Url, html => Html}};
+                                        PopupHtml = render_block(popup_html, Template, Vars, Context),
+                                        {true, #{lat => Lat,
+                                                 lon => Lon,
+                                                 html => Html,
+                                                 popup_html => PopupHtml }};
                                     {error, enoent} ->
                                         ?LOG_ERROR(#{
                                                      text => <<"Missing map marker template">>,

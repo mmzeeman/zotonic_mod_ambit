@@ -61,11 +61,8 @@
 
         const marker = L.marker([lat, lon]);
 
-        if (loc.title || loc.url) {
-            const content = loc.url
-                ? `<a href="${loc.url}">${loc.title || loc.url}</a>`
-                : loc.title;
-            marker.bindPopup(content);
+        if (loc.popup_html) {
+            marker.bindPopup(loc.popup_html);
         }
 
         if (loc.html) {
