@@ -22,10 +22,43 @@
 -mod_title("Geographic indexing and search based on Ambit").
 -mod_description("Module for geographic indexing and search using ambit icosahedral triangular cells.").
 
+-define(XYZ_TILE_URL, "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png").
+-define(MAX_ZOOM, 20).
+-define(ATTRIBUTION, <<"©️ <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors | ©️ <a href=\"https://carto.com/\">CARTO</a>"/utf8>>).
+
+-mod_config([
+        #{
+            module => ?MODULE,
+            key => xyz_tile_url,
+            type => string,
+            default => ?XYZ_TILE_URL,
+            description => "XYZ raster tile URL template. Supports {s} for subdomain and {z}, {x}, {y} for zoom level and tile coordinates."
+        },
+        #{
+            module => ?MODULE,
+            key => max_zoom,
+            type => integer,
+            default => ?MAX_ZOOM,
+            description => "The maximum zoom level used for the map. The max level depends on the tile server."
+        },
+        #{
+            module => ?MODULE,
+            key => attribution,
+            type => string,
+            default => ?ATTRIBUTION,
+            description => "The copyright notice at the bottom of the map. Depends on the tile server used."
+        }
+
+]).
+ 
 -include_lib("zotonic_core/include/zotonic.hrl").
 
 -export([
-    init/1
+    init/1,
+    xyz_tile_url/1,
+    max_zoom/1,
+    attribution/1
+    
     % observe_custom_pivot/2,
     % observe_rsc_get/3
 ]).
@@ -36,6 +69,36 @@ init(Context) ->
     %                                     Context),
 
     ok.
+
+xyz_tile_url(Context) ->
+    case m_config:get(?MODULE, xyz_tile_url, Context) of
+        undefined -> ?XYZ_TILE_URL;
+        <<>> -> ?XYZ_TILE_URL;
+        "" -> ?XYZ_TILE_URL;
+        Props ->
+            {value, Value} = proplists:lookup(value, Props),
+            Value
+    end.
+
+
+max_zoom(Context) ->
+    case m_config:get(?MODULE, max_zoom, Context) of
+        Empty when Empty =:= <<>> orelse Empty =:= undefined orelse Empty =:= "" ->
+            ?MAX_ZOOM;
+        Props ->
+            {value, Value} = proplists:lookup(value, Props),
+            z_convert:to_integer(Value)
+    end.
+
+attribution(Context) ->
+    case m_config:get(?MODULE, attribution, Context) of
+        undefined -> ?ATTRIBUTION;
+        <<>> -> ?ATTRIBUTION;
+        "" -> ?ATTRIBUTION;
+        Props ->
+            {value, Value} = proplists:lookup(value, Props),
+            Value
+    end.
 
 observe_rsc_get(#rsc_get{}, Props, _Context) ->
     Props.

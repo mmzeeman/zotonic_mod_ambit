@@ -60,6 +60,14 @@
 %%           {ok, {term(), [binary()]}} | {error, term()}
 -spec m_get([binary()], term(), z:context()) ->
         {ok, {term(), [binary()]}} | {error, term()}.
+
+m_get([<<"xyz_tile_url">> | Rest], _Msg, Context) ->
+    {ok, {mod_ambit:xyz_tile_url(Context), Rest}};
+m_get([<<"max_zoom">> | Rest], _Msg, Context) ->
+    {ok, {mod_ambit:max_zoom(Context), Rest}};
+m_get([<<"attribution">> | Rest], _Msg, Context) ->
+    {ok, {mod_ambit:attribution(Context), Rest}};
+
 m_get([<<"nearby">> | Rest], Msg, Context) ->
     Args   = get_args(Msg),
     Lat    = maps:get(<<"lat">>,    Args, undefined),

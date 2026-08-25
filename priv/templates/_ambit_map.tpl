@@ -36,10 +36,9 @@
 
     // https://carto.com/blog/new-voyager-basemap/
     L.tileLayer(
-       'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', {
-        maxZoom: 20,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
-        '&copy; <a href="https://carto.com/">CARTO</a>'
+        `{{ m.ambit.xyz_tile_url }}`, {
+        maxZoom: {{ m.ambit.max_zoom }},
+        attribution: "{{ m.ambit.attribution | escapejs }}"
     }).addTo(map);
 
     if (hasSingleLocation && showCenterMarker) {
