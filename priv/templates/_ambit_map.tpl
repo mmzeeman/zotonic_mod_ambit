@@ -1,6 +1,25 @@
-{# Renders an interactive Leaflet map for one or more locations.
-   Variables: location_lat, location_lng, locations, zoom, width, height, element_id, class,
-              show_center_marker, select_on_map, lat_field_id, lng_field_id #}
+{#
+    Map Component
+
+    Displays an interactive map showing one or more locations.
+
+    Expected variables:
+    - location      : A single location object
+    - locations     : A list of location objects
+    - zoom          : Optional zoom level
+    - marker_title  : Optional marker label/title
+
+    Notes:
+    - When `location` is provided, the map is centered on that location.
+    - When `locations` is provided, markers are shown for all locations and
+      the map automatically fits the visible bounds.
+    - Either `location` or `locations` can be supplied.
+
+    Output:
+    - Interactive map with one or more markers
+    - Automatic viewport adjustment for multiple locations
+    - Responsive map container
+#}
 
 {% with element_id|default:#map as map_id %}
 <div id="{{ map_id }}"
