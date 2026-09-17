@@ -42,24 +42,28 @@
 
 -include_lib("zotonic_core/include/zotonic.hrl").
 
+-define(DEFAULT_ZOOM, 15).
+
 vary(_Params, _Context) -> nocache.
 
 render(Params, _Vars, Context) ->
-    {Latitude, Longitude} = case get_latlong(Params, Context) of
-        {Lat, Lng} -> {Lat, Lng};
-        _ -> {undefined, undefined}
-    end,
+    {Latitude, Longitude} = get_latlong(Params, Context),
     ExplicitLocations = normalize_locations(proplists:get_value(locations, Params)),
     IdLocations = ids_to_locations(proplists:get_value(ids, Params), Context),
     Locations = IdLocations ++ ExplicitLocations,
+
     HasLocation = is_float(Latitude) andalso is_float(Longitude),
     HasLocations = is_list(Locations) andalso Locations =/= [],
+
     SelectOnMap = z_convert:to_bool(proplists:get_value(select_on_map, Params, false)),
+
     case HasLocation orelse HasLocations orelse SelectOnMap of
         true ->
-            Zoom   = z_convert:to_integer(proplists:get_value(zoom,   Params, 15)),
-            Width  = proplists:get_value(width,  Params, <<"700px">>),
+            Zoom = get_zoom(Params, Context),
+
+            Width = proplists:get_value(width,  Params, <<"700px">>),
             Height = proplists:get_value(height, Params, <<"480px">>),
+
             ShowCenterMarker = z_convert:to_bool(
                                    proplists:get_value(show_center_marker, Params, true)),
             LatFieldId = proplists:get_value(lat_field_id, Params, undefined),
@@ -106,6 +110,27 @@ get_latlong(Params, Context) ->
             {catch z_convert:to_float(Lat), catch z_convert:to_float(proplists:get_value(longitude, Params))}
     end.
 
+get_zoom(Params, Context) ->
+    case proplists:get_value(zoom, Params) of
+        undefined ->
+            case proplists:get_value(id, Params) of
+                undefined -> ?DEFAULT_ZOOM;
+                Id ->
+                    case m_rsc:rid(Id, Context) of
+                        undefined -> ?DEFAULT_ZOOM;
+                        RId ->
+                            case m_rsc:p(RId, location_zoom_level, Context) of
+                                undefined -> ?DEFAULT_ZOOM;
+                                Zoom -> z_convert:to_integer(Zoom)
+                            end
+                    end
+            end;
+        Zoom -> z_convert:to_integer(Zoom)
+    end.
+
+
+                            
+
 normalize_locations(Locations) when is_list(Locations) ->
     [ Loc || Loc <- [normalize_location(Location) || Location <- Locations], Loc =/= undefined ];
 normalize_locations(_) ->
@@ -121,7 +146,9 @@ ids_to_locations(Ids, Context) when is_list(Ids) ->
                     undefined ->
                         false;
                     RId ->
-                        case {m_rsc:p(RId, location_lat, Context), m_rsc:p(RId, location_lng, Context)} of
+                        case {m_rsc:p(RId, location_lat, Context),
+                              m_rsc:p(RId, location_lng, Context)}
+                        of
                             {Lat, Lon} when is_float(Lat), is_float(Lon) ->
                                 Vars = #{ id => RId },
                                 case z_template_compiler_runtime:map_template({cat, <<"_ambit_map_marker.tpl">>}, Vars, Context) of

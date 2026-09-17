@@ -139,12 +139,15 @@
         });
     }
 
-    if (bounds.length > 1) {
+    // Center on the provided centrePoint and its zoom level. When this is not
+    // provided, use the bounds of the provided locations, if there is only
+    // a single location provided, use that as centre with the default zoom.
+    if (centrePoint) {
+        map.setView(centrePoint, zoom);
+    } else if (bounds.length > 1) {
         map.fitBounds(bounds, { padding: [20, 20] });
     } else if (bounds.length === 1) {
         map.setView(bounds[0], zoom);
-    } else if (centrePoint) {
-        map.setView(centrePoint, zoom);
     } else {
         map.setView([0, 0], zoom);
     }
