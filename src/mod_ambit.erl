@@ -24,6 +24,7 @@
 
 -define(XYZ_TILE_URL, "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png").
 -define(MAX_ZOOM, 20).
+-define(MIN_ZOOM, 10).
 -define(ATTRIBUTION, <<"©️ <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors | ©️ <a href=\"https://carto.com/\">CARTO</a>"/utf8>>).
 
 -mod_config([
@@ -33,6 +34,13 @@
             type => string,
             default => ?XYZ_TILE_URL,
             description => "XYZ raster tile URL template. Supports {s} for subdomain and {z}, {x}, {y} for zoom level and tile coordinates."
+        },
+        #{
+            module => ?MODULE,
+            key => min_zoom,
+            type => integer,
+            default => ?MIN_ZOOM,
+            description => "The minimum zoom level allowed on the map."
         },
         #{
             module => ?MODULE,
@@ -48,7 +56,6 @@
             default => ?ATTRIBUTION,
             description => "The copyright notice at the bottom of the map. Depends on the tile server used."
         }
-
 ]).
  
 -include_lib("zotonic_core/include/zotonic.hrl").
@@ -57,17 +64,29 @@
     init/1,
     xyz_tile_url/1,
     max_zoom/1,
-    attribution/1
+    min_zoom/1,
+    attribution/1,
     
-    % observe_custom_pivot/2,
+    observe_custom_pivot/2
+
     % observe_rsc_get/3
 ]).
 
 init(Context) ->
-    %ok = z_pivot_rsc:define_custom_pivot(?MODULE,
-    %                                     [#column_def{ name = ambit_code, type = <<"TEXT">>}],
-    %                                     Context),
+    ok = z_pivot_rsc:define_custom_pivot(?MODULE,
+                                         [
+                                          #column_def{ name = ambit, type = <<"TEXT">>},
 
+                                          #column_def{ name = ambit_12, type = <<"TEXT">>},
+                                          #column_def{ name = ambit_13, type = <<"TEXT">>},
+                                          #column_def{ name = ambit_14, type = <<"TEXT">>},
+                                          #column_def{ name = ambit_15, type = <<"TEXT">>},
+
+                                          #column_def{ name = computed_lat, type = <<"DOUBLE">>},
+                                          #column_def{ name = computed_lng, type = <<"DOUBLE">>}
+
+                                         ],
+                                         Context),
     ok.
 
 xyz_tile_url(Context) ->
@@ -80,11 +99,19 @@ xyz_tile_url(Context) ->
             Value
     end.
 
-
 max_zoom(Context) ->
     case m_config:get(?MODULE, max_zoom, Context) of
         Empty when Empty =:= <<>> orelse Empty =:= undefined orelse Empty =:= "" ->
             ?MAX_ZOOM;
+        Props ->
+            {value, Value} = proplists:lookup(value, Props),
+            z_convert:to_integer(Value)
+    end.
+
+min_zoom(Context) ->
+    case m_config:get(?MODULE, min_zoom, Context) of
+        Empty when Empty =:= <<>> orelse Empty =:= undefined orelse Empty =:= "" ->
+            ?MIN_ZOOM;
         Props ->
             {value, Value} = proplists:lookup(value, Props),
             z_convert:to_integer(Value)
@@ -107,32 +134,45 @@ observe_custom_pivot(#custom_pivot{ id = Id }, Context) ->
     custom_pivot(Id, Context).
 
 custom_pivot(Id, Context) ->
-    case get_location(Id, Context) of
+    case get_lat_lng(Id, Context) of
         undefined ->
-            case m_rsc:p_no_acl(Id, ambit_code, Context) of
-                Code when is_binary(Code) ->
-                    {?MODULE, [{ambit_code, Code}]};
-                _ ->
+            case get_ambit_code(Id, Context) of
+                undefined ->
                     Locations = m_rsc:o(Id, has_location, Context),
-                    case find_location(Locations, Context) of
+                    case find_lat_lng(Locations, Context) of
                         undefined ->
-                            case find_ambit_code(Locations, Context) of
-                                undefined ->
-                                    none;
-                                Code ->
-                                    {?MODULE, [{ambit_code, Code}]}
-                            end;
-                        {Lat, Lng} ->
-                            Code = ambit:encode({Lat, Lng}, 24),
-                            {?MODULE, [{ambit_code, Code}]}
-                    end
+                            pivot_data(find_ambit_code(Locations, Context));
+                        Loc -> pivot_data(Loc)
+                    end;
+                Code -> pivot_data(Code)
             end;
-        {Lat, Lng} ->
-            Code = ambit:encode({Lat, Lng}, 24),
-            {?MODULE, [{ambit_code, Code}]}
+        Loc -> pivot_data(Loc)
     end.
 
-get_location(Id, Context) ->
+pivot_data({Lat, Lng}=Loc) ->
+    Code = ambit:encode({Lat, Lng}, 24),
+    pivot_data(Loc, Code);
+pivot_data(Code) when is_binary(Code) ->
+    Loc = ambit:decode(Code),
+    pivot_data(Loc, Code);
+pivot_data(_) ->
+    none.
+
+pivot_data({Lat, Lng}, Code) ->
+    {?MODULE, [{ambit, Code},
+               {ambit_12, coarsen(Code, 12)},
+               {ambit_13, coarsen(Code, 13)},
+               {ambit_14, coarsen(Code, 14)},
+               {ambit_15, coarsen(Code, 15)},
+               {computed_lat, Lat},
+               {computed_lng, Lng}]}.
+
+coarsen(Code, Level) when byte_size(Code) + 2 >= Level ->
+    binary:part(Code, 0, Level+2);
+coarsen(Code, _Level) ->
+    Code.
+
+get_lat_lng(Id, Context) ->
     case {catch z_convert:to_float(m_rsc:p_no_acl(Id, location_lat, Context)),
           catch z_convert:to_float(m_rsc:p_no_acl(Id, location_lng, Context))}
     of
@@ -142,24 +182,20 @@ get_location(Id, Context) ->
             undefined
     end.
 
+get_ambit_code(Id, Context) ->
+    m_rsc:p_no_acl(Id, ambit_code, Context).
 
-find_location([], _Context) ->
-    undefined;
-find_location([H|T], Context) ->
-    case get_location(H, Context) of
-        undefined ->
-            find_location(T, Context);
-        Location ->
-            Location
+find_lat_lng([], _Context) -> undefined;
+find_lat_lng([H|T], Context) ->
+    case get_lat_lng(H, Context) of
+        undefined -> find_lat_lng(T, Context);
+        Location -> Location
     end.
 
-find_ambit_code([], _Context) ->
-    undefined;
+find_ambit_code([], _Context) -> undefined;
 find_ambit_code([H|T], Context) ->
-    case m_rsc:p_no_acl(H, ambit_code, Context) of
-        Code when is_binary(Code) ->
-            Code;
-        _ ->
-            find_ambit_code(T, Context)
+    case get_ambit_code(H, Context) of
+        undefined -> find_ambit_code(T, Context);
+        Code -> Code
     end.
 
