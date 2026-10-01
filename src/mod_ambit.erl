@@ -24,7 +24,7 @@
 
 -define(XYZ_TILE_URL, "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png").
 -define(MAX_ZOOM, 20).
--define(MIN_ZOOM, 10).
+-define(MIN_ZOOM, 13).
 -define(ATTRIBUTION, <<"©️ <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors | ©️ <a href=\"https://carto.com/\">CARTO</a>"/utf8>>).
 
 -mod_config([
@@ -76,15 +76,8 @@ init(Context) ->
     ok = z_pivot_rsc:define_custom_pivot(?MODULE,
                                          [
                                           #column_def{ name = ambit, type = <<"TEXT">>},
-
-                                          #column_def{ name = ambit_12, type = <<"TEXT">>},
-                                          #column_def{ name = ambit_13, type = <<"TEXT">>},
-                                          #column_def{ name = ambit_14, type = <<"TEXT">>},
-                                          #column_def{ name = ambit_15, type = <<"TEXT">>},
-
                                           #column_def{ name = computed_lat, type = <<"DOUBLE">>},
                                           #column_def{ name = computed_lng, type = <<"DOUBLE">>}
-
                                          ],
                                          Context),
     ok.
@@ -160,17 +153,8 @@ pivot_data(_) ->
 
 pivot_data({Lat, Lng}, Code) ->
     {?MODULE, [{ambit, Code},
-               {ambit_12, coarsen(Code, 12)},
-               {ambit_13, coarsen(Code, 13)},
-               {ambit_14, coarsen(Code, 14)},
-               {ambit_15, coarsen(Code, 15)},
                {computed_lat, Lat},
                {computed_lng, Lng}]}.
-
-coarsen(Code, Level) when byte_size(Code) + 2 >= Level ->
-    binary:part(Code, 0, Level+2);
-coarsen(Code, _Level) ->
-    Code.
 
 get_lat_lng(Id, Context) ->
     case {catch z_convert:to_float(m_rsc:p_no_acl(Id, location_lat, Context)),

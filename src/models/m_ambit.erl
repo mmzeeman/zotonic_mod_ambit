@@ -63,6 +63,8 @@
 
 m_get([<<"xyz_tile_url">> | Rest], _Msg, Context) ->
     {ok, {mod_ambit:xyz_tile_url(Context), Rest}};
+m_get([<<"min_zoom">> | Rest], _Msg, Context) ->
+    {ok, {mod_ambit:min_zoom(Context), Rest}};
 m_get([<<"max_zoom">> | Rest], _Msg, Context) ->
     {ok, {mod_ambit:max_zoom(Context), Rest}};
 m_get([<<"attribution">> | Rest], _Msg, Context) ->

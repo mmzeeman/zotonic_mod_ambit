@@ -57,6 +57,7 @@
     L.tileLayer(
         `{{ m.ambit.xyz_tile_url }}`, {
         maxZoom: {{ m.ambit.max_zoom }},
+        minZoom: {{ m.ambit.min_zoom }},
         attribution: "{{ m.ambit.attribution | escapejs }}"
     }).addTo(map);
 
@@ -65,6 +66,7 @@
         bounds.push([locationLat, locationLng]);
     }
 
+    /*
     locations.forEach(function(loc) {
         if (!loc || loc.lat === undefined || loc.lon === undefined) {
             return;
@@ -96,6 +98,7 @@
 
         bounds.push([lat, lon]);
     });
+    */
 
     if (selectOnMap) {
         let selectMarker = null;
@@ -139,6 +142,15 @@
         });
     }
 
+    // also 'movestart', 'move'
+    map.on('moveend', () => {
+        const bounds = map.getBounds();
+        cotonic.broker.publish("model/map/{{ map_id }}/event/moveend",
+                               {"zoom": map.getZoom(),
+                                "bounds": [bounds.getNorth(), bounds.getWest(),
+                                           bounds.getSouth(), bounds.getEast()]});
+    });
+
     // Center on the provided centrePoint and its zoom level. When this is not
     // provided, use the bounds of the provided locations, if there is only
     // a single location provided, use that as centre with the default zoom.
@@ -151,6 +163,42 @@
     } else {
         map.setView([0, 0], zoom);
     }
+
+    // Dynamic marker stuff
+    let dynamicMarkers = {};
+
+    cotonic.broker.subscribe("model/map/{{ map_id }}/post/markers", (msg, binding) => {
+        // Haal oude markers weg en zet er nieuwe bij.
+        const markers = msg.payload;
+
+        // Remove the old
+        Object.values(dynamicMarkers).forEach( (p) => {
+            p.removeFrom(map);
+        })
+
+        // Add the new.
+        markers.forEach((m) => {
+            const cluster = L.marker([m.location_lat, m.location_lng]);
+            if (m.html) {
+                cluster.setIcon(L.divIcon({className: 'resource-marker',
+                                           html: m.html,
+                                           iconSize: [40, 40],
+                                           iconAnchor: [20, 40],
+                                           popupAnchor: [0, -40]
+                                           }
+                                          )
+                               );
+            }
+            cluster.addTo(map);
+            dynamicMarkers[m.code] = cluster;
+        });
+    })
 })();
 {% endjavascript %}
+
+{% wire type={mqtt topic=["model", "map", map_id, "event", "moveend"]}
+        postback={moveend map_id=map_id} 
+        delegate="scomp_ambit_ambit_map"
+%}
+
 {% endwith %}
