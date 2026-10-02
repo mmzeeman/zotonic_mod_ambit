@@ -204,10 +204,13 @@ observe_search_query(#search_query{ name = <<"ambit_cluster">>, args = Args }, _
                   AVG(a.computed_lat) AS avg_lat,
                   AVG(a.computed_lng) AS avg_lng",
         from = "rsc r JOIN pivot_mod_ambit a ON a.id = r.id",
-        where = "r.is_published AND a.computed_lat IS NOT NULL AND a.computed_lng IS NOT NULL AND a.ambit LIKE ANY (SELECT p || '%' FROM unnest($1::text[]) AS p)",
+        where = "r.is_published
+                 AND a.computed_lat IS NOT NULL
+                 AND a.computed_lng IS NOT NULL
+                 AND a.ambit LIKE ANY (SELECT prefix || '%' FROM unnest($1::text[]) AS p(prefix))",
         group_by = "ambit_code",
         order = "ambit_code",
-        args = [Codes, Res],   % $1 = text[] of prefixes, $2 = integer
+        args = [Codes, Res],
         cats=[{"r", Cat}],
         tables = [{rsc, "r"}]
     };
