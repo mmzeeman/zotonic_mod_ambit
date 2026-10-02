@@ -67,9 +67,9 @@
     min_zoom/1,
     attribution/1,
     
-    observe_custom_pivot/2
+    observe_custom_pivot/2,
+    observe_search_query/2
 
-    % observe_rsc_get/3
 ]).
 
 init(Context) ->
@@ -120,8 +120,10 @@ attribution(Context) ->
             Value
     end.
 
-observe_rsc_get(#rsc_get{}, Props, _Context) ->
-    Props.
+
+%%
+%% Custom Pivot
+%%
 
 observe_custom_pivot(#custom_pivot{ id = Id }, Context) ->
     custom_pivot(Id, Context).
@@ -182,4 +184,40 @@ find_ambit_code([H|T], Context) ->
         undefined -> find_ambit_code(T, Context);
         Code -> Code
     end.
+
+%%
+%% Ambit search queries
+%%
+
+observe_search_query(#search_query{ name = <<"ambit_cluster">>, args = Args }, _Context) ->
+    Zoom = qarg(<<"zoom">>, Args, 13),
+    Cat = qarg(<<"cat">>, Args, undefined),
+    [North, West, South, East] = qarg(<<"bounds">>, Args, [0,0,0,0]),
+
+    Res = mapzoom_to_res(Zoom),
+    Codes = ambit:bounds({North, West, South, East}, Res, corner),
+
+    #search_sql{
+        select = "LEFT(a.ambit, $2::int + 2) AS ambit_code,
+                  (array_agg(r.id ORDER BY r.created DESC))[1] AS newest_rsc_id,
+                  COUNT(*) AS total_count,
+                  AVG(a.computed_lat) AS avg_lat,
+                  AVG(a.computed_lng) AS avg_lng",
+        from = "rsc r JOIN pivot_mod_ambit a ON a.id = r.id",
+        where = "r.is_published AND a.computed_lat IS NOT NULL AND a.computed_lng IS NOT NULL AND a.ambit LIKE ANY (SELECT p || '%' FROM unnest($1::text[]) AS p)",
+        group_by = "ambit_code",
+        order = "ambit_code",
+        args = [Codes, Res],   % $1 = text[] of prefixes, $2 = integer
+        cats=[{"r", Cat}],
+        tables = [{rsc, "r"}]
+    };
+observe_search_query(#search_query{}, _Context) ->
+    undefined.
+ 
+mapzoom_to_res(MapZoom) ->
+    max(1, MapZoom - 2).
+
+qarg(K, Terms, Default) ->
+    z_search:lookup_qarg_value(K, Terms, Default).
+
 

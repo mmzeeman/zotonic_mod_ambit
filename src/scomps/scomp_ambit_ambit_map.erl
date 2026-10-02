@@ -45,12 +45,14 @@
 
 -define(DEFAULT_ZOOM, 15).
 
-event(#postback{message={moveend, Args}}, Context) ->
+event(#postback{message={update, Args}}, Context) ->
     {map_id, MapId} = proplists:lookup(map_id, Args),
+    {cat, Cat} = proplists:lookup(cat, Args),
+
     case z_context:get_q(<<"payload">>, Context) of
         #{ <<"bounds">> := Bounds,
            <<"zoom">> := Zoom } ->
-            Cluster = cluster(Zoom, Bounds, Context),
+            Cluster = cluster(Cat, Zoom, Bounds, Context),
 
             z_mqtt:publish([<<"~client">>, <<"model">>,
                             <<"map">>, MapId, <<"post">>, <<"markers">>],
@@ -66,54 +68,10 @@ event(Event, Context) ->
     ?DEBUG(Event),
     Context.
 
-cluster(Zoom, [North, West, South, East], Context) ->
-    Res = mapzoom_to_res(Zoom),
-    Codes = ambit:bounds({North, West, South, East}, Res, corner),
+cluster(Cat, Zoom, Bounds, Context) ->
+    {ok, #search_result{}=Result} = m_search:search(<<"ambit_cluster">>, #{ zoom => Zoom, bounds => Bounds, cat => Cat}, Context),
 
-    %% de locatie het gemiddelde van de items in het driehoekje maken.
-    Clusters = z_db:q("
-WITH filtered AS (
-    SELECT
-        LEFT(a.ambit, $2 + 2) AS ambit_code,
-        r.id              AS rsc_id,
-        r.created         AS created,
-        a.computed_lat    AS lat,
-        a.computed_lng    AS lng
-    FROM pivot_mod_ambit a
-    JOIN rsc r ON r.id = a.id
-    WHERE r.is_published
-      AND a.computed_lat IS NOT NULL
-      AND a.computed_lng IS NOT NULL
-      AND a.ambit LIKE ANY (
-          SELECT p || '%' FROM unnest($1::text[]) AS p
-      )
-      -- [TODO] Hier komen de andere filters dan.
-),
-cluster_agg AS (
-    SELECT
-        ambit_code,
-        COUNT(*) AS total_count,
-        AVG(lat) AS avg_lat,
-        AVG(lng) AS avg_lng
-    FROM filtered
-    GROUP BY ambit_code
-),
-newest AS (
-    SELECT DISTINCT ON (ambit_code)
-        ambit_code,
-        rsc_id AS newest_rsc_id
-    FROM filtered
-    ORDER BY ambit_code, created DESC
-)
-SELECT
-    c.ambit_code,
-    n.newest_rsc_id,
-    c.total_count,
-    c.avg_lat,
-    c.avg_lng
-FROM cluster_agg c
-JOIN newest n USING (ambit_code)
-ORDER BY c.ambit_code;", [Codes, Res], Context),
+    Clusters = Result#search_result.result,
 
     [begin
          Template = "_ambit_map_cluster_marker.tpl",
@@ -121,20 +79,17 @@ ORDER BY c.ambit_code;", [Codes, Res], Context),
                  {id, RscId},
                  {count, Count}],
          Html = render_block(html, Template, Vars, Context),
-         ?DEBUG(Html),
          #{ code => Code,
             html => Html,
             location_lat => Lat,
             location_lng => Lng} 
      end || {Code, RscId, Count, Lat, Lng} <- Clusters].
 
-mapzoom_to_res(MapZoom) ->
-    max(1, MapZoom - 2).
-
 vary(_Params, _Context) -> nocache.
 
 render(Params, _Vars, Context) ->
     {Latitude, Longitude} = get_latlong(Params, Context),
+
     ExplicitLocations = normalize_locations(proplists:get_value(locations, Params)),
     IdLocations = ids_to_locations(proplists:get_value(ids, Params), Context),
     Locations = IdLocations ++ ExplicitLocations,
@@ -153,8 +108,10 @@ render(Params, _Vars, Context) ->
 
             ShowCenterMarker = z_convert:to_bool(
                                    proplists:get_value(show_center_marker, Params, true)),
+
             LatFieldId = proplists:get_value(lat_field_id, Params, undefined),
             LngFieldId = proplists:get_value(lng_field_id, Params, undefined),
+
             Vars0 = [
                 {has_location, HasLocation},
                 {show_center_marker, ShowCenterMarker},
@@ -166,14 +123,24 @@ render(Params, _Vars, Context) ->
                 {height, Height}
                 | Params
             ],
+
             Vars1 = case HasLocation of
-                true -> [{location_lat, Latitude}, {location_lng, Longitude} | Vars0];
-                false -> Vars0
+                        true -> [{location_lat, Latitude}, {location_lng, Longitude} | Vars0];
+                        false -> Vars0
             end,
+
+            Vars2 = case proplists:get_value(cat, Params) of
+                        undefined ->
+                            Vars1;
+                        Query ->
+                            [{cat, Query} | Vars1]
+                    end,
+
             Vars = case HasLocations of
-                true -> [{locations, Locations} | Vars1];
-                false -> Vars1
-            end,
+                       true -> [{locations, Locations} | Vars2];
+                       false -> Vars2
+                   end,
+
             {ok, z_template:render("_ambit_map.tpl", Vars, Context)};
         false ->
             {ok, <<>>}

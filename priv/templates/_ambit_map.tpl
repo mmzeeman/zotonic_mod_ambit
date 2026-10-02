@@ -21,10 +21,12 @@
     - Responsive map container
 #}
 
-{% with element_id|default:#map as map_id %}
+{% with element_id | default:#map as map_id %}
+
 <div id="{{ map_id }}"
      class="ambit-map{% if class %} {{ class }}{% endif %}"
      style="width:{{ width|default:"700px" }}; height:{{ height|default:"480px" }};"></div>
+
 
 {% javascript %}
 (function() {
@@ -53,7 +55,6 @@
     // centre point as a fallback for setView when no other markers are present.
     const centrePoint = hasSingleLocation ? [locationLat, locationLng] : null;
 
-    // https://carto.com/blog/new-voyager-basemap/
     L.tileLayer(
         `{{ m.ambit.xyz_tile_url }}`, {
         maxZoom: {{ m.ambit.max_zoom }},
@@ -66,7 +67,6 @@
         bounds.push([locationLat, locationLng]);
     }
 
-    /*
     locations.forEach(function(loc) {
         if (!loc || loc.lat === undefined || loc.lon === undefined) {
             return;
@@ -98,7 +98,6 @@
 
         bounds.push([lat, lon]);
     });
-    */
 
     if (selectOnMap) {
         let selectMarker = null;
@@ -142,31 +141,17 @@
         });
     }
 
-    // also 'movestart', 'move'
-    map.on('moveend', () => {
+    function publish_map_update(retain) {
         const bounds = map.getBounds();
-        cotonic.broker.publish("model/map/{{ map_id }}/event/moveend",
+        cotonic.broker.publish("model/map/{{ map_id }}/event/update",
                                {"zoom": map.getZoom(),
                                 "bounds": [bounds.getNorth(), bounds.getWest(),
-                                           bounds.getSouth(), bounds.getEast()]});
-    });
-
-    // Center on the provided centrePoint and its zoom level. When this is not
-    // provided, use the bounds of the provided locations, if there is only
-    // a single location provided, use that as centre with the default zoom.
-    if (centrePoint) {
-        map.setView(centrePoint, zoom);
-    } else if (bounds.length > 1) {
-        map.fitBounds(bounds, { padding: [20, 20] });
-    } else if (bounds.length === 1) {
-        map.setView(bounds[0], zoom);
-    } else {
-        map.setView([0, 0], zoom);
+                                           bounds.getSouth(), bounds.getEast()]},
+                               {retain: retain});
     }
 
     // Dynamic marker stuff
     let dynamicMarkers = {};
-
     cotonic.broker.subscribe("model/map/{{ map_id }}/post/markers", (msg, binding) => {
         // Haal oude markers weg en zet er nieuwe bij.
         const markers = msg.payload;
@@ -193,12 +178,33 @@
             dynamicMarkers[m.code] = cluster;
         });
     })
-})();
+
+    map.on('load', () => { publish_map_update(true) }); // use a retained message. The observer is bound later
+    map.on('moveend', () => { publish_map_update(false) });
+
+    // Center on the provided centrePoint and its zoom level. When this is not
+    // provided, use the bounds of the provided locations, if there is only
+    // a single location provided, use that as centre with the default zoom.
+    if (centrePoint) {
+        map.setView(centrePoint, zoom);
+    } else if (bounds.length > 1) {
+        map.fitBounds(bounds, { padding: [20, 20] });
+    } else if (bounds.length === 1) {
+        map.setView(bounds[0], zoom);
+    } else {
+        map.setView([0, 0], zoom);
+    }
+
+
+    })();
 {% endjavascript %}
 
-{% wire type={mqtt topic=["model", "map", map_id, "event", "moveend"]}
-        postback={moveend map_id=map_id} 
-        delegate="scomp_ambit_ambit_map"
-%}
+{# When we need to react to dynamic updates, post the updates to the scomp #}
+{% if cat %}
+    {% wire type={mqtt topic=["model", "map", map_id, "event", "update"]}
+            postback={update map_id=map_id cat=cat} 
+            delegate="scomp_ambit_ambit_map"
+    %}
+{% endif %}
 
 {% endwith %}
