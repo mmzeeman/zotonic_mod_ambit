@@ -157,9 +157,10 @@
         const markers = msg.payload;
 
         // Remove the old
-        Object.values(dynamicMarkers).forEach( (p) => {
+        Object.values(dynamicMarkers).forEach((p) => {
             p.removeFrom(map);
-        })
+        });
+        dynamicMarkers = {};
 
         // Add the new.
         markers.forEach((m) => {
