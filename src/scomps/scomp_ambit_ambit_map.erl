@@ -39,15 +39,57 @@
 -behaviour(zotonic_scomp).
 
 -export([vary/2, render/3]).
+-export([event/2]).
 
 -include_lib("zotonic_core/include/zotonic.hrl").
 
 -define(DEFAULT_ZOOM, 15).
 
+event(#postback{message={update, Args}}, Context) ->
+    {map_id, MapId} = proplists:lookup(map_id, Args),
+    {cat, Cat} = proplists:lookup(cat, Args),
+
+    case z_context:get_q(<<"payload">>, Context) of
+        #{ <<"bounds">> := Bounds,
+           <<"zoom">> := Zoom } ->
+            Cluster = cluster(Cat, Zoom, Bounds, Context),
+
+            z_mqtt:publish([<<"~client">>, <<"model">>,
+                            <<"map">>, MapId, <<"post">>, <<"markers">>],
+                           Cluster,
+                           Context),
+
+            Context;
+        _ ->
+            Context
+    end;
+
+event(Event, Context) ->
+    ?DEBUG(Event),
+    Context.
+
+cluster(Cat, Zoom, Bounds, Context) ->
+    {ok, #search_result{}=Result} = m_search:search(<<"ambit_cluster">>, #{ zoom => Zoom, bounds => Bounds, cat => Cat}, Context),
+
+    Clusters = Result#search_result.result,
+
+    [begin
+         Template = <<"_ambit_map_cluster_marker.tpl">>,
+         Vars = [{code, Code},
+                 {id, RscId},
+                 {count, Count}],
+         Html = render_block(html, Template, Vars, Context),
+         #{ code => Code,
+            html => Html,
+            location_lat => Lat,
+            location_lng => Lng} 
+     end || {Code, RscId, Count, Lat, Lng} <- Clusters].
+
 vary(_Params, _Context) -> nocache.
 
 render(Params, _Vars, Context) ->
     {Latitude, Longitude} = get_latlong(Params, Context),
+
     ExplicitLocations = normalize_locations(proplists:get_value(locations, Params)),
     IdLocations = ids_to_locations(proplists:get_value(ids, Params), Context),
     Locations = IdLocations ++ ExplicitLocations,
@@ -66,8 +108,10 @@ render(Params, _Vars, Context) ->
 
             ShowCenterMarker = z_convert:to_bool(
                                    proplists:get_value(show_center_marker, Params, true)),
+
             LatFieldId = proplists:get_value(lat_field_id, Params, undefined),
             LngFieldId = proplists:get_value(lng_field_id, Params, undefined),
+
             Vars0 = [
                 {has_location, HasLocation},
                 {show_center_marker, ShowCenterMarker},
@@ -79,15 +123,25 @@ render(Params, _Vars, Context) ->
                 {height, Height}
                 | Params
             ],
+
             Vars1 = case HasLocation of
-                true -> [{location_lat, Latitude}, {location_lng, Longitude} | Vars0];
-                false -> Vars0
+                        true -> [{location_lat, Latitude}, {location_lng, Longitude} | Vars0];
+                        false -> Vars0
             end,
+
+            Vars2 = case proplists:get_value(cat, Params) of
+                        undefined ->
+                            Vars1;
+                        Query ->
+                            [{cat, Query} | Vars1]
+                    end,
+
             Vars = case HasLocations of
-                true -> [{locations, Locations} | Vars1];
-                false -> Vars1
-            end,
-            {ok, z_template:render("_ambit_map.tpl", Vars, Context)};
+                       true -> [{locations, Locations} | Vars2];
+                       false -> Vars2
+                   end,
+
+            {ok, z_template:render(<<"_ambit_map.tpl">>, Vars, Context)};
         false ->
             {ok, <<>>}
     end.

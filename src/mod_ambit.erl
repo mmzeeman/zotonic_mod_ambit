@@ -24,7 +24,7 @@
 
 -define(XYZ_TILE_URL, "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png").
 -define(MAX_ZOOM, 20).
--define(MIN_ZOOM, 10).
+-define(MIN_ZOOM, 13).
 -define(ATTRIBUTION, <<"©️ <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors | ©️ <a href=\"https://carto.com/\">CARTO</a>"/utf8>>).
 
 -mod_config([
@@ -67,24 +67,17 @@
     min_zoom/1,
     attribution/1,
     
-    observe_custom_pivot/2
+    observe_custom_pivot/2,
+    observe_search_query/2
 
-    % observe_rsc_get/3
 ]).
 
 init(Context) ->
     ok = z_pivot_rsc:define_custom_pivot(?MODULE,
                                          [
                                           #column_def{ name = ambit, type = <<"TEXT">>},
-
-                                          #column_def{ name = ambit_12, type = <<"TEXT">>},
-                                          #column_def{ name = ambit_13, type = <<"TEXT">>},
-                                          #column_def{ name = ambit_14, type = <<"TEXT">>},
-                                          #column_def{ name = ambit_15, type = <<"TEXT">>},
-
                                           #column_def{ name = computed_lat, type = <<"DOUBLE">>},
                                           #column_def{ name = computed_lng, type = <<"DOUBLE">>}
-
                                          ],
                                          Context),
     ok.
@@ -127,8 +120,10 @@ attribution(Context) ->
             Value
     end.
 
-observe_rsc_get(#rsc_get{}, Props, _Context) ->
-    Props.
+
+%%
+%% Custom Pivot
+%%
 
 observe_custom_pivot(#custom_pivot{ id = Id }, Context) ->
     custom_pivot(Id, Context).
@@ -160,17 +155,8 @@ pivot_data(_) ->
 
 pivot_data({Lat, Lng}, Code) ->
     {?MODULE, [{ambit, Code},
-               {ambit_12, coarsen(Code, 12)},
-               {ambit_13, coarsen(Code, 13)},
-               {ambit_14, coarsen(Code, 14)},
-               {ambit_15, coarsen(Code, 15)},
                {computed_lat, Lat},
                {computed_lng, Lng}]}.
-
-coarsen(Code, Level) when byte_size(Code) + 2 >= Level ->
-    binary:part(Code, 0, Level+2);
-coarsen(Code, _Level) ->
-    Code.
 
 get_lat_lng(Id, Context) ->
     case {catch z_convert:to_float(m_rsc:p_no_acl(Id, location_lat, Context)),
@@ -198,4 +184,45 @@ find_ambit_code([H|T], Context) ->
         undefined -> find_ambit_code(T, Context);
         Code -> Code
     end.
+
+%%
+%% Ambit search queries
+%%
+
+observe_search_query(#search_query{ name = <<"ambit_cluster">>, args = Args }, _Context) ->
+    Zoom = qarg(<<"zoom">>, Args, 13),
+    Cat = qarg(<<"cat">>, Args, undefined),
+    [North, West, South, East] = qarg(<<"bounds">>, Args, [0,0,0,0]),
+
+    %% [TODO] Add a limit to the bounds calculation in order to
+    %% prevent producing a lot of codes.
+    Res = mapzoom_to_res(Zoom),
+    Codes = ambit:bounds({North, West, South, East}, Res, corner),
+
+    #search_sql{
+        select = "LEFT(a.ambit, $2::int + 2) AS ambit_code,
+                  (array_agg(r.id ORDER BY r.created DESC))[1] AS newest_rsc_id,
+                  COUNT(*) AS total_count,
+                  AVG(a.computed_lat) AS avg_lat,
+                  AVG(a.computed_lng) AS avg_lng",
+        from = "rsc r JOIN pivot_mod_ambit a ON a.id = r.id",
+        where = "r.is_published
+                 AND a.computed_lat IS NOT NULL
+                 AND a.computed_lng IS NOT NULL
+                 AND a.ambit LIKE ANY (SELECT prefix || '%' FROM unnest($1::text[]) AS p(prefix))",
+        group_by = "ambit_code",
+        order = "ambit_code",
+        args = [Codes, Res],
+        cats=[{"r", Cat}],
+        tables = [{rsc, "r"}]
+    };
+observe_search_query(#search_query{}, _Context) ->
+    undefined.
+ 
+mapzoom_to_res(MapZoom) ->
+    max(1, min(MapZoom, 19) - 2).
+
+qarg(K, Terms, Default) ->
+    z_search:lookup_qarg_value(K, Terms, Default).
+
 
