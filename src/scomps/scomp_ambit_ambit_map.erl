@@ -90,6 +90,7 @@ vary(_Params, _Context) -> nocache.
 render(Params, _Vars, Context) ->
     {Latitude, Longitude} = get_latlong(Params, Context),
 
+
     ExplicitLocations = normalize_locations(proplists:get_value(locations, Params)),
     IdLocations = ids_to_locations(proplists:get_value(ids, Params), Context),
     Locations = IdLocations ++ ExplicitLocations,
@@ -130,15 +131,23 @@ render(Params, _Vars, Context) ->
             end,
 
             Vars2 = case proplists:get_value(cat, Params) of
-                        undefined ->
-                            Vars1;
-                        Query ->
-                            [{cat, Query} | Vars1]
+                        undefined -> Vars1;
+                        Query -> [{cat, Query} | Vars1]
+                    end,
+
+            Vars3 = case proplists:get_value(marker_tpl, Params) of
+                        undefined -> Vars2;
+                        Tpl -> [{marker_tpl, Tpl} | Vars2]
+                    end,
+
+            Vars4 = case proplists:get_value(cluster_tpl, Params) of
+                        undefined -> Vars3;
+                        Tpl -> [{cluster_tpl, Tpl} | Vars3]
                     end,
 
             Vars = case HasLocations of
-                       true -> [{locations, Locations} | Vars2];
-                       false -> Vars2
+                       true -> [{locations, Locations} | Vars4];
+                       false -> Vars4
                    end,
 
             {ok, z_template:render(<<"_ambit_map.tpl">>, Vars, Context)};
@@ -181,9 +190,6 @@ get_zoom(Params, Context) ->
             end;
         Zoom -> z_convert:to_integer(Zoom)
     end.
-
-
-                            
 
 normalize_locations(Locations) when is_list(Locations) ->
     [ Loc || Loc <- [normalize_location(Location) || Location <- Locations], Loc =/= undefined ];
