@@ -74,7 +74,7 @@ cluster(Cat, Zoom, Bounds, Context) ->
     Clusters = Result#search_result.result,
 
     [begin
-         Template = "_ambit_map_cluster_marker.tpl",
+         Template = <<"_ambit_map_cluster_marker.tpl">>,
          Vars = [{code, Code},
                  {id, RscId},
                  {count, Count}],
@@ -141,7 +141,7 @@ render(Params, _Vars, Context) ->
                        false -> Vars2
                    end,
 
-            {ok, z_template:render("_ambit_map.tpl", Vars, Context)};
+            {ok, z_template:render(<<"_ambit_map.tpl">>, Vars, Context)};
         false ->
             {ok, <<>>}
     end.

@@ -194,6 +194,8 @@ observe_search_query(#search_query{ name = <<"ambit_cluster">>, args = Args }, _
     Cat = qarg(<<"cat">>, Args, undefined),
     [North, West, South, East] = qarg(<<"bounds">>, Args, [0,0,0,0]),
 
+    %% [TODO] Add a limit to the bounds calculation in order to
+    %% prevent producing a lot of codes.
     Res = mapzoom_to_res(Zoom),
     Codes = ambit:bounds({North, West, South, East}, Res, corner),
 
@@ -218,7 +220,7 @@ observe_search_query(#search_query{}, _Context) ->
     undefined.
  
 mapzoom_to_res(MapZoom) ->
-    max(1, MapZoom - 2).
+    max(1, min(MapZoom, 19) - 2).
 
 qarg(K, Terms, Default) ->
     z_search:lookup_qarg_value(K, Terms, Default).

@@ -1,7 +1,6 @@
 {% extends "_ambit_map_marker.tpl" %}
 
 {% block html %}
-
 <div class="position-relative">
     <div class="d-flex">
         {% if id.depiction %}
