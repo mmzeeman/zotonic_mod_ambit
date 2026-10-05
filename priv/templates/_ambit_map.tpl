@@ -195,9 +195,7 @@
     } else {
         map.setView([0, 0], zoom);
     }
-
-
-    })();
+})();
 {% endjavascript %}
 
 {# When we need to react to dynamic updates, post the updates to the scomp #}
