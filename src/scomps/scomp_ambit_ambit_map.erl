@@ -44,16 +44,20 @@
 -include_lib("zotonic_core/include/zotonic.hrl").
 
 -define(DEFAULT_ZOOM, 15).
+-define(DEFAULT_MARKER_TPL,         <<"_ambit_map_marker.tpl">>).
+-define(DEFAULT_MARKER_CLUSTER_TPL, <<"_ambit_map_marker_cluster.tpl">>).
 
 event(#postback{message={update, Args}}, Context) ->
     {map_id, MapId} = proplists:lookup(map_id, Args),
     {cat, Cat} = proplists:lookup(cat, Args),
 
+    MarkerTpl = proplists:get_value(marker_tpl, Args, ?DEFAULT_MARKER_TPL),
+    ClusterTpl = proplists:get_value(cluster_tpl, Args, ?DEFAULT_MARKER_CLUSTER_TPL),
+
     case z_context:get_q(<<"payload">>, Context) of
         #{ <<"bounds">> := Bounds,
            <<"zoom">> := Zoom } ->
-            Cluster = cluster(Cat, Zoom, Bounds, Context),
-
+            Cluster = cluster(Cat, Zoom, Bounds, MarkerTpl, ClusterTpl, Context),
             z_mqtt:publish([<<"~client">>, <<"model">>,
                             <<"map">>, MapId, <<"post">>, <<"markers">>],
                            Cluster,
@@ -63,35 +67,41 @@ event(#postback{message={update, Args}}, Context) ->
         _ ->
             Context
     end;
-
-event(Event, Context) ->
-    ?DEBUG(Event),
+event(_Event, Context) ->
     Context.
 
-cluster(Cat, Zoom, Bounds, Context) ->
+cluster(Cat, Zoom, Bounds, MarkerTpl, ClusterTpl, Context) ->
     {ok, #search_result{}=Result} = m_search:search(<<"ambit_cluster">>, #{ zoom => Zoom, bounds => Bounds, cat => Cat}, Context),
-
     Clusters = Result#search_result.result,
-
-    [begin
-         Template = <<"_ambit_map_cluster_marker.tpl">>,
-         Vars = [{code, Code},
-                 {id, RscId},
-                 {count, Count}],
-         Html = render_block(html, Template, Vars, Context),
-         #{ code => Code,
-            html => Html,
-            location_lat => Lat,
-            location_lng => Lng} 
-     end || {Code, RscId, Count, Lat, Lng} <- Clusters].
+    lists:filtermap(fun({Code, RscId, Count, Lat, Lng}) ->
+                            Tpl = case Count of
+                                      1 -> template(MarkerTpl, ?DEFAULT_MARKER_TPL);
+                                      _ -> template(ClusterTpl, ?DEFAULT_MARKER_CLUSTER_TPL)
+                                  end,
+                            Vars = #{code => Code,
+                                     id => RscId,
+                                     count => Count},
+                            case map_template(Tpl, Vars, Context) of
+                                {ok, Template} ->
+                                    Html = render_block(html, Template, Vars, Context),
+                                    PopupHtml = render_block(popup_html, Template, Vars, Context),
+                                    {true, #{ code => Code, html => Html, popup_html => PopupHtml, location_lat => Lat, location_lng => Lng}};
+                                {error, _} ->
+                                    false
+                            end
+                    end,
+                    Clusters).
 
 vary(_Params, _Context) -> nocache.
 
+template(undefined, Default) -> Default;
+template(Tpl, _Default) -> Tpl.
+
 render(Params, _Vars, Context) ->
     {Latitude, Longitude} = get_latlong(Params, Context),
-
     ExplicitLocations = normalize_locations(proplists:get_value(locations, Params)),
-    IdLocations = ids_to_locations(proplists:get_value(ids, Params), Context),
+    MarkerTpl = proplists:get_value(marker_tpl, Params, ?DEFAULT_MARKER_TPL),
+    IdLocations = ids_to_locations(proplists:get_value(ids, Params), MarkerTpl, Context),
     Locations = IdLocations ++ ExplicitLocations,
 
     HasLocation = is_float(Latitude) andalso is_float(Longitude),
@@ -130,15 +140,23 @@ render(Params, _Vars, Context) ->
             end,
 
             Vars2 = case proplists:get_value(cat, Params) of
-                        undefined ->
-                            Vars1;
-                        Query ->
-                            [{cat, Query} | Vars1]
+                        undefined -> Vars1;
+                        Query -> [{cat, Query} | Vars1]
+                    end,
+
+            Vars3 = case proplists:get_value(marker_tpl, Params) of
+                        undefined -> Vars2;
+                        MarkerTpl -> [{marker_tpl, MarkerTpl} | Vars2]
+                    end,
+
+            Vars4 = case proplists:get_value(cluster_tpl, Params) of
+                        undefined -> Vars3;
+                        ClusterTpl -> [{cluster_tpl, ClusterTpl} | Vars3]
                     end,
 
             Vars = case HasLocations of
-                       true -> [{locations, Locations} | Vars2];
-                       false -> Vars2
+                       true -> [{locations, Locations} | Vars4];
+                       false -> Vars4
                    end,
 
             {ok, z_template:render(<<"_ambit_map.tpl">>, Vars, Context)};
@@ -182,9 +200,6 @@ get_zoom(Params, Context) ->
         Zoom -> z_convert:to_integer(Zoom)
     end.
 
-
-                            
-
 normalize_locations(Locations) when is_list(Locations) ->
     [ Loc || Loc <- [normalize_location(Location) || Location <- Locations], Loc =/= undefined ];
 normalize_locations(_) ->
@@ -193,35 +208,23 @@ normalize_locations(_) ->
 %% @doc Resolve a list of resource ids to location maps.
 %%      Each id is looked up via m_rsc; resources without a computed location
 %%      are silently skipped.
-ids_to_locations(Ids, Context) when is_list(Ids) ->
+ids_to_locations(Ids, MarkerTpl, Context)
+  when is_list(Ids) ->
     lists:filtermap(
         fun(Id) ->
                 case m_rsc:rid(Id, Context) of
                     undefined ->
                         false;
                     RId ->
-                        case {m_rsc:p(RId, location_lat, Context),
-                              m_rsc:p(RId, location_lng, Context)}
-                        of
+                        case {m_rsc:p(RId, location_lat, Context), m_rsc:p(RId, location_lng, Context)} of
                             {Lat, Lon} when is_float(Lat), is_float(Lon) ->
                                 Vars = #{ id => RId },
-                                case z_template_compiler_runtime:map_template({cat, <<"_ambit_map_marker.tpl">>}, Vars, Context) of
+                                case map_template(MarkerTpl, Vars, Context) of
                                     {ok, Template} ->
                                         Html = render_block(html, Template, Vars, Context),
                                         PopupHtml = render_block(popup_html, Template, Vars, Context),
-                                        {true, #{lat => Lat,
-                                                 lon => Lon,
-                                                 html => Html,
-                                                 popup_html => PopupHtml }};
+                                        {true, #{lat => Lat, lon => Lon, html => Html, popup_html => PopupHtml }};
                                     {error, enoent} ->
-                                        ?LOG_ERROR(#{
-                                                     text => <<"Missing map marker template">>,
-                                                     in => mod_ambit,
-                                                     result => error,
-                                                     reason => enoent,
-                                                     template => <<"_ambit_marker_template.tpl">>,
-                                                     id => Id
-                                                    }),
                                         false
                                 end;
                             _ ->
@@ -230,7 +233,7 @@ ids_to_locations(Ids, Context) when is_list(Ids) ->
                 end
         end,
         Ids);
-ids_to_locations(_, _Context) ->
+ids_to_locations(_, _Template, _Context) ->
     [].
 
 normalize_location(Location) when is_map(Location); is_list(Location) ->
@@ -258,6 +261,22 @@ sanitize_location_url(<<"#", _/binary>> = Url) -> Url;
 sanitize_location_url(<<"http://", _/binary>> = Url) -> Url;
 sanitize_location_url(<<"https://", _/binary>> = Url) -> Url;
 sanitize_location_url(_) -> <<"#">>.
+ 
+map_template(Tpl, Vars, Context) ->
+    case z_template_compiler_runtime:map_template({cat, Tpl}, Vars, Context) of
+        {ok, Template} ->
+            {ok, Template};
+        {error, enoent} ->
+            ?LOG_ERROR(#{
+                         text => <<"Missing map marker template">>,
+                         in => mod_ambit,
+                         result => error,
+                         reason => enoent,
+                         template => Tpl,
+                         vars => Vars
+                        }),
+            {error, enoent}
+    end.
 
 render_block(Block, Template, Vars, Context) ->
     {Output, _RenderState} = z_template:render_block_to_iolist(Block, Template, Vars, Context),
