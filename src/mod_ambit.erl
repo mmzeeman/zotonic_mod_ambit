@@ -192,6 +192,8 @@ find_ambit_code([H|T], Context) ->
 observe_search_query(#search_query{ name = <<"ambit_cluster">>, args = Args }, _Context) ->
     Zoom = qarg(<<"zoom">>, Args, 13),
     Cat = qarg(<<"cat">>, Args, undefined),
+    CatExact = qarg(<<"cat_exact">>, Args, undefined),
+    CatExclude = qarg(<<"cat_exclude">>, Args, undefined),
     [North, West, South, East] = qarg(<<"bounds">>, Args, [0,0,0,0]),
 
     %% [TODO] Add a limit to the bounds calculation in order to
@@ -214,6 +216,8 @@ observe_search_query(#search_query{ name = <<"ambit_cluster">>, args = Args }, _
         order = "ambit_code",
         args = [Codes, Res],
         cats=[{"r", Cat}],
+        cats_exclude=[{"r", CatExclude}],
+        cats_exact=[{"r", CatExact}],
         tables = [{rsc, "r"}]
     };
 observe_search_query(#search_query{}, _Context) ->
