@@ -69,7 +69,47 @@
     
     observe_custom_pivot/2,
     observe_search_query/2
+]).
 
+%% These search terms only add WHERE clauses, so I can add them to the select clause which
+%% does the clustering.
+-define(STD_TERMS, [
+    %% categories
+    <<"cat">>, <<"cat_exact">>, <<"cat_exclude">>,
+    %% text
+    <<"text">>,
+    %% edges
+    <<"hasobject">>, <<"hassubject">>,
+    <<"hasobjectpredicate">>, <<"hassubjectpredicate">>,
+    <<"hasanyobject">>, <<"hasanysubject">>,
+    %% resource flags
+    <<"is_featured">>, <<"is_published">>, <<"is_public">>,
+    <<"is_findable">>, <<"is_unfindable">>, <<"is_protected">>,
+    <<"is_dependent">>, <<"is_authoritative">>, <<"hasmedium">>,
+    %% identity / ownership / access
+    <<"id">>, <<"id_exclude">>, <<"rsc_id">>, <<"name">>,
+    <<"creator_id">>, <<"modifier_id">>,
+    <<"content_group">>, <<"content_group_exclude">>,
+    <<"visible_for">>,
+    %% language
+    <<"language">>, <<"notlanguage">>,
+    %% dates: created / modified / publication
+    <<"created_after">>, <<"created_before">>,
+    <<"modified_after">>, <<"modified_before">>,
+    <<"publication_after">>, <<"publication_before">>,
+    <<"publication_year">>, <<"publication_month">>,
+    %% dates: event start / end
+    <<"date_start_after">>, <<"date_start_before">>,
+    <<"date_start_year">>, <<"date_start_month">>,
+    <<"date_end_after">>, <<"date_end_before">>, <<"date_end_year">>,
+    %% event state
+    <<"upcoming">>, <<"upcoming_on">>, <<"upcoming_date">>,
+    <<"ongoing">>, <<"ongoing_on">>, <<"ongoing_date">>,
+    <<"finished">>, <<"finished_on">>, <<"finished_date">>,
+    <<"unfinished">>, <<"unfinished_on">>, <<"unfinished_date">>,
+    <<"unfinished_or_nodate">>,
+    %% related-resource matching
+    <<"match_objects">>, <<"match_object_ids">>
 ]).
 
 init(Context) ->
@@ -119,7 +159,6 @@ attribution(Context) ->
             {value, Value} = proplists:lookup(value, Props),
             Value
     end.
-
 
 %%
 %% Custom Pivot
@@ -189,44 +228,63 @@ find_ambit_code([H|T], Context) ->
 %% Ambit search queries
 %%
 
-observe_search_query(#search_query{ name = <<"ambit_cluster">>, args = Args }, _Context) ->
+observe_search_query(#search_query{ name = <<"ambit_cluster">>, args = Args }, Context) ->
     Zoom = qarg(<<"zoom">>, Args, 13),
-    Cat = qarg(<<"cat">>, Args, undefined),
-    CatExact = qarg(<<"cat_exact">>, Args, undefined),
-    CatExclude = qarg(<<"cat_exclude">>, Args, undefined),
     [North, West, South, East] = qarg(<<"bounds">>, Args, [0,0,0,0]),
 
-    %% [TODO] Add a limit to the bounds calculation in order to
-    %% prevent producing a lot of codes.
-    Res = mapzoom_to_res(Zoom),
-    Codes = ambit:bounds({North, West, South, East}, Res, corner),
+    #{ <<"q">> := Terms } = Args,
+    StdTerms = [ T || #{ <<"term">> := Name } = T <- Terms, lists:member(Name, ?STD_TERMS) ],
 
-    #search_sql{
-        select = "LEFT(a.ambit, $2::int + 2) AS ambit_code,
-                  (array_agg(r.id ORDER BY r.created DESC))[1] AS newest_rsc_id,
-                  COUNT(*) AS total_count,
-                  AVG(a.computed_lat) AS avg_lat,
-                  AVG(a.computed_lng) AS avg_lng",
-        from = "rsc r JOIN pivot_mod_ambit a ON a.id = r.id",
-        where = "r.is_published
-                 AND a.computed_lat IS NOT NULL
-                 AND a.computed_lng IS NOT NULL
-                 AND a.ambit LIKE ANY (SELECT prefix || '%' FROM unnest($1::text[]) AS p(prefix))",
-        group_by = "ambit_code",
-        order = "ambit_code",
-        args = [Codes, Res],
-        cats=[{"r", Cat}],
-        cats_exclude=[{"r", CatExclude}],
-        cats_exact=[{"r", CatExact}],
-        tables = [{rsc, "r"}]
-    };
+    case search_query:search(#{<<"q">> => StdTerms}, Context) of
+        #search_result{} = Empty ->
+            Empty;
+        #search_sql_terms{} = SqlTerms ->
+            %% [TODO] Add a limit to the bounds calculation in order to
+            %% prevent producing a lot of codes.
+            Res = mapzoom_to_res(Zoom),
+            Codes = ambit:bounds({North, West, South, East}, Res, corner),
+
+            Q = z_search_terms:combine(SqlTerms),
+            ambit_cluster_query(Q, Codes, Res)
+    end;
 observe_search_query(#search_query{}, _Context) ->
     undefined.
+
+ambit_cluster_query(#search_sql{args = Args, from = From, where = Where} = Q, Codes, Res) ->
+    %% The edge terms already use $1..$N, so our args are numbered after them.
+    N = length(Args),
+    CodesArg = integer_to_binary(N + 1),
+    ResArg = integer_to_binary(N + 2),
+
+    AmbitWhere = iolist_to_binary([
+        <<"a.id = rsc.id
+           AND a.computed_lat IS NOT NULL
+           AND a.computed_lng IS NOT NULL
+           AND a.ambit LIKE ANY (SELECT prefix || '%' FROM unnest($">>, CodesArg,
+        <<"::text[]) AS p(prefix))">>
+    ]),
+
+    Q#search_sql{
+        select = iolist_to_binary([
+            <<"LEFT(a.ambit, $">>, ResArg, <<"::int + 2) AS ambit_code,
+               (array_agg(rsc.id ORDER BY rsc.created DESC))[1] AS newest_rsc_id,
+               COUNT(*) AS total_count,
+               AVG(a.computed_lat) AS avg_lat,
+               AVG(a.computed_lng) AS avg_lng">>
+        ]),
+        from = iolist_to_binary([From, <<", pivot_mod_ambit a">>]),
+        where = case Where of
+                    <<>> -> AmbitWhere;
+                    _ -> iolist_to_binary([Where, <<" AND ">>, AmbitWhere])
+                end,
+        group_by = <<"ambit_code">>,
+        order = <<"ambit_code">>,
+        args = Args ++ [Codes, Res]
+    }.
  
 mapzoom_to_res(MapZoom) ->
     max(1, min(MapZoom, 19) - 2).
 
 qarg(K, Terms, Default) ->
     z_search:lookup_qarg_value(K, Terms, Default).
-
 
