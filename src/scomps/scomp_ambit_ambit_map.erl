@@ -49,7 +49,7 @@
 
 event(#postback{message={update, Args}}, Context) ->
     {map_id, MapId} = proplists:lookup(map_id, Args),
-    {cat, Cat} = proplists:lookup(cat, Args),
+    {search, Search} = proplists:lookup(search, Args),
 
     MarkerTpl = proplists:get_value(marker_tpl, Args, ?DEFAULT_MARKER_TPL),
     ClusterTpl = proplists:get_value(cluster_tpl, Args, ?DEFAULT_MARKER_CLUSTER_TPL),
@@ -57,7 +57,7 @@ event(#postback{message={update, Args}}, Context) ->
     case z_context:get_q(<<"payload">>, Context) of
         #{ <<"bounds">> := Bounds,
            <<"zoom">> := Zoom } ->
-            Cluster = cluster(Cat, Zoom, Bounds, MarkerTpl, ClusterTpl, Context),
+            Cluster = cluster(Search, Zoom, Bounds, MarkerTpl, ClusterTpl, Context),
             z_mqtt:publish([<<"~client">>, <<"model">>,
                             <<"map">>, MapId, <<"post">>, <<"markers">>],
                            Cluster,
@@ -70,8 +70,10 @@ event(#postback{message={update, Args}}, Context) ->
 event(_Event, Context) ->
     Context.
 
-cluster(Cat, Zoom, Bounds, MarkerTpl, ClusterTpl, Context) ->
-    {ok, #search_result{}=Result} = m_search:search(<<"ambit_cluster">>, #{ zoom => Zoom, bounds => Bounds, cat => Cat}, Context),
+cluster(Search, Zoom, Bounds, MarkerTpl, ClusterTpl, Context) ->
+    {ok, #search_result{}=Result} = m_search:search(<<"ambit_cluster">>,
+                                                    maps:merge(Search, #{ zoom => Zoom, bounds => Bounds }),
+                                                    Context),
     Clusters = Result#search_result.result,
     lists:filtermap(fun({Code, RscId, Count, Lat, Lng}) ->
                             Tpl = case Count of
@@ -139,19 +141,19 @@ render(Params, _Vars, Context) ->
                         false -> Vars0
             end,
 
-            Vars2 = case proplists:get_value(cat, Params) of
+            Vars2 = case proplists:get_value(marker_tpl, Params) of
                         undefined -> Vars1;
-                        Query -> [{cat, Query} | Vars1]
+                        MarkerTpl -> [{marker_tpl, MarkerTpl} | Vars1]
                     end,
 
-            Vars3 = case proplists:get_value(marker_tpl, Params) of
+            Vars3 = case proplists:get_value(cluster_tpl, Params) of
                         undefined -> Vars2;
-                        MarkerTpl -> [{marker_tpl, MarkerTpl} | Vars2]
+                        ClusterTpl -> [{cluster_tpl, ClusterTpl} | Vars2]
                     end,
 
-            Vars4 = case proplists:get_value(cluster_tpl, Params) of
+            Vars4 = case proplists:get_value(search, Params) of
                         undefined -> Vars3;
-                        ClusterTpl -> [{cluster_tpl, ClusterTpl} | Vars3]
+                        SearchArgs -> [{search, SearchArgs} | Vars3]
                     end,
 
             Vars = case HasLocations of

@@ -199,9 +199,10 @@
 {% endjavascript %}
 
 {# When we need to react to dynamic updates, post the updates to the scomp #}
-{% if cat %}
+
+{% if search %}
     {% wire type={mqtt topic=["model", "map", map_id, "event", "update"]}
-            postback={update map_id=map_id cat=cat marker_tpl=marker_tpl cluster_tpl=cluster_tpl} 
+            postback={update map_id=map_id search=search marker_tpl=marker_tpl cluster_tpl=cluster_tpl} 
             delegate="scomp_ambit_ambit_map"
     %}
 {% endif %}
