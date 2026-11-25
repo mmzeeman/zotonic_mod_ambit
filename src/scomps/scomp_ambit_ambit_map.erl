@@ -72,9 +72,16 @@ event(_Event, Context) ->
 
 cluster(Search, Zoom, Bounds, MarkerTpl, ClusterTpl, Context) ->
     {ok, #search_result{}=Result} = m_search:search(<<"ambit_cluster">>,
-                                                    maps:merge(Search, #{ zoom => Zoom, bounds => Bounds }),
+                                                    maps:merge(Search,
+                                                               #{ <<"page">> => 1,
+                                                                  <<"pagelen">> => 500,
+                                                                  <<"zoom">> => Zoom,
+                                                                  <<"bounds">> => Bounds }),
                                                     Context),
+
+
     Clusters = Result#search_result.result,
+
     lists:filtermap(fun({Code, RscId, Count, Lat, Lng}) ->
                             Tpl = case Count of
                                       1 -> template(MarkerTpl, ?DEFAULT_MARKER_TPL);

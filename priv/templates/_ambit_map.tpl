@@ -27,7 +27,6 @@
      class="ambit-map{% if class %} {{ class }}{% endif %}"
      style="width:{{ width|default:"700px" }}; height:{{ height|default:"480px" }};"></div>
 
-
 {% javascript %}
 (function() {
     var el = document.getElementById('{{ map_id }}');
