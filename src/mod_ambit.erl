@@ -109,7 +109,9 @@
     <<"unfinished">>, <<"unfinished_on">>, <<"unfinished_date">>,
     <<"unfinished_or_nodate">>,
     %% related-resource matching
-    <<"match_objects">>, <<"match_object_ids">>
+    <<"match_objects">>, <<"match_object_ids">>,
+    %% filters
+    <<"filter">>
 ]).
 
 init(Context) ->
@@ -193,9 +195,7 @@ pivot_data(_) ->
     none.
 
 pivot_data({Lat, Lng}, Code) ->
-    {?MODULE, [{ambit, Code},
-               {computed_lat, Lat},
-               {computed_lng, Lng}]}.
+    {?MODULE, [{ambit, Code}, {computed_lat, Lat}, {computed_lng, Lng}]}.
 
 get_lat_lng(Id, Context) ->
     case {catch z_convert:to_float(m_rsc:p_no_acl(Id, location_lat, Context)),
